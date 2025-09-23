@@ -179,15 +179,27 @@ function generatePin(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Get random question pair (group + impostor) - pairs are sequential
-function getRandomQuestionPair(): { group: Question; impostor: Question } {
-  // Questions are paired in sequence: odd IDs are group, even IDs are impostor
-  const pairCount = Math.floor(SAMPLE_QUESTIONS.length / 2);
-  const randomPairIndex = Math.floor(Math.random() * pairCount);
-  
-  const groupQuestion = SAMPLE_QUESTIONS[randomPairIndex * 2];
-  const impostorQuestion = SAMPLE_QUESTIONS[randomPairIndex * 2 + 1];
-  
+// Get random question pair (group + impostor) with diversity to avoid obvious opposites
+function getDiverseQuestionPair(): { group: Question; impostor: Question } {
+  const groupQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'group');
+  const impostorQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'impostor');
+
+  const groupQuestion = groupQuestions[Math.floor(Math.random() * groupQuestions.length)];
+
+  // Prefer impostor questions that are NOT the sequential opposite and have different tags
+  const preferredPool = impostorQuestions.filter(q => {
+    const notOpposite = Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1;
+    const differentTag = groupQuestion.tags && q.tags
+      ? !groupQuestion.tags.some(t => (q.tags || []).includes(t))
+      : true;
+    return notOpposite && differentTag;
+  });
+
+  const fallbackPool = impostorQuestions.filter(q => Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1);
+  const usablePool = preferredPool.length > 0 ? preferredPool : (fallbackPool.length > 0 ? fallbackPool : impostorQuestions);
+
+  const impostorQuestion = usablePool[Math.floor(Math.random() * usablePool.length)];
+
   return { group: groupQuestion, impostor: impostorQuestion };
 }
 
@@ -262,8 +274,22 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Game already in progress' });
       return;
     }
+
+    // Enforce unique player names (case-insensitive, trimmed)
+    const normalizedName = (displayName || '').trim();
+    if (!normalizedName) {
+      socket.emit('error', { message: 'Display name is required' });
+      return;
+    }
+    const nameTaken = Array.from(room.players.values()).some(
+      (p) => p.displayName.trim().toLowerCase() === normalizedName.toLowerCase()
+    );
+    if (nameTaken) {
+      socket.emit('error', { message: 'That player name is already in use. Pick another name.' });
+      return;
+    }
     
-    const user: User = { id: userId, displayName, socketId: socket.id };
+    const user: User = { id: userId, displayName: normalizedName, socketId: socket.id };
     room.players.set(userId, user);
     room.scores.set(userId, 0);
     userSockets.set(userId, socket.id);
@@ -301,6 +327,35 @@ io.on('connection', (socket) => {
     
     socket.emit('room:joined', { roomId: room.id, pin });
     socket.emit('room:update', { players, state: room.state });
+  });
+
+  // Allow clients to re-identify after reconnect to refresh their socket mapping
+  socket.on('user:identify', (data: { userId: string; pin?: string }) => {
+    const { userId, pin } = data || {} as any;
+    if (!userId) return;
+    userSockets.set(userId, socket.id);
+    // Update socketId inside any room that contains this user
+    for (const room of rooms.values()) {
+      if (room.players.has(userId)) {
+        const user = room.players.get(userId)!;
+        user.socketId = socket.id;
+        if (pin && pin === room.pin) {
+          socket.join(room.pin);
+          // Send a lightweight state ping so client can refresh if needed
+          const players = Array.from(room.players.values()).map(p => ({ id: p.id, displayName: p.displayName }));
+          socket.emit('room:update', { players, state: room.state });
+          // If a round is active, resend their current prompt
+          if (room.state === 'answering' && room.currentRoundData) {
+            const isImpostor = user.id === room.currentRoundData.impostorId;
+            const question = isImpostor ? room.currentRoundData.impostorQuestion : room.currentRoundData.groupQuestion;
+            socket.emit(isImpostor ? 'prompt:impostor' : 'prompt:group', {
+              text: question,
+              players
+            });
+          }
+        }
+      }
+    }
   });
 
   socket.on('game:start', (data) => {
@@ -457,7 +512,7 @@ function startRound(room: Room) {
   
   const players = Array.from(room.players.keys());
   const impostorId = players[Math.floor(Math.random() * players.length)];
-  const { group, impostor } = getRandomQuestionPair();
+  const { group, impostor } = getDiverseQuestionPair();
   
   room.currentRoundData = {
     impostorId,
@@ -621,6 +676,12 @@ function endGame(room: Room) {
 
 // Timer synchronization function
 function startTimerSync(room: Room, duration: number) {
+  // Clear any existing phase timer to prevent overlapping updates
+  if (room.timerInterval) {
+    clearInterval(room.timerInterval);
+    room.timerInterval = undefined;
+  }
+
   let timeLeft = duration;
   
   const timerInterval = setInterval(() => {

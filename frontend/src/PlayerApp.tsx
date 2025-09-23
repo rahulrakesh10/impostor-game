@@ -1,5 +1,5 @@
 // frontend/src/PlayerApp.tsx - Player-specific interface
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
 
 interface Player {
@@ -43,16 +43,9 @@ function PlayerApp() {
   const [answerSubmitted, setAnswerSubmitted] = useState<boolean>(false);
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false);
   const [currentTheme, setCurrentTheme] = useState<string>('default');
+  const joinContext = useRef<{ userId: string; displayName: string; pin: string } | null>(null);
 
-  // Countdown timer effect - sync with server
-  useEffect(() => {
-    if (countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(prev => Math.max(0, prev - 1));
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [countdown]);
+  // Remove local ticking; countdown is driven by server 'timer:update'
 
   // Apply theme to document
   useEffect(() => {
@@ -66,18 +59,24 @@ function PlayerApp() {
 
     // Socket event listeners
     newSocket.on('room:joined', (data) => {
+      const ctx = joinContext.current;
+      setError('');
       setGameState(prev => ({
         ...prev,
         state: 'lobby',
-        room: { ...prev.room!, pin: data.pin }
+        user: ctx ? { id: ctx.userId, displayName: ctx.displayName, isHost: false } : prev.user,
+        room: { pin: data.pin, players: [] }
       }));
     });
 
     newSocket.on('room:update', (data) => {
-      setGameState(prev => ({
-        ...prev,
-        room: { ...prev.room!, players: data.players }
-      }));
+      setGameState(prev => {
+        const pin = prev.room?.pin || joinContext.current?.pin || '';
+        const mergedRoom = prev.room
+          ? { ...prev.room, players: data.players }
+          : { pin, players: data.players };
+        return { ...prev, room: mergedRoom };
+      });
     });
 
     newSocket.on('round:start', (data) => {
@@ -162,6 +161,7 @@ function PlayerApp() {
 
     newSocket.on('error', (data) => {
       setError(data.message);
+      setGameState(prev => ({ ...prev, state: 'landing' }));
     });
 
     return () => {
@@ -171,14 +171,11 @@ function PlayerApp() {
 
   const joinRoom = (pin: string, displayName: string) => {
     const userId = Math.random().toString(36).substring(7);
-    
-    setGameState({
-      state: 'lobby',
-      user: { id: userId, displayName, isHost: false },
-      room: { pin, players: [] }
-    });
-    
+    setError('');
+    joinContext.current = { userId, displayName, pin };
     socket?.emit('room:join', { pin, userId, displayName });
+    // In case of slow network/reconnects, proactively identify after connect
+    socket?.emit('user:identify', { userId, pin });
   };
 
   const submitAnswer = () => {
@@ -204,7 +201,7 @@ function PlayerApp() {
   };
 
   if (gameState.state === 'landing') {
-    return <PlayerLandingScreen onJoinRoom={joinRoom} />;
+    return <PlayerLandingScreen onJoinRoom={joinRoom} error={error} />;
   }
 
   if (gameState.state === 'lobby') {
@@ -294,7 +291,7 @@ function PlayerApp() {
 }
 
 // Player-specific components
-function PlayerLandingScreen({ onJoinRoom }: { onJoinRoom: (pin: string, name: string) => void }) {
+function PlayerLandingScreen({ onJoinRoom, error }: { onJoinRoom: (pin: string, name: string) => void; error?: string }) {
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
 
@@ -312,6 +309,11 @@ function PlayerLandingScreen({ onJoinRoom }: { onJoinRoom: (pin: string, name: s
         <div className="player-badge">
           📱 Player Screen - Perfect for Phone
         </div>
+        {error && (
+          <div className="waiting-message" style={{ marginTop: '1rem' }}>
+            <p style={{ color: '#b91c1c' }}>⚠️ {error}</p>
+          </div>
+        )}
         
         <div className="player-setup">
           <div className="join-instructions">

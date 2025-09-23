@@ -37,9 +37,11 @@ function App() {
     localStorage.setItem('userModePreference', mode);
   };
 
-  const handleResetMode = () => {
-    setShowModeSelector(true);
-    localStorage.removeItem('userModePreference');
+  const handleSwitchMode = () => {
+    const nextMode = isHostScreen ? 'player' : 'host';
+    setIsHostScreen(nextMode === 'host');
+    setShowModeSelector(false);
+    localStorage.setItem('userModePreference', nextMode);
   };
 
   // Show mode selector if user hasn't chosen yet
@@ -82,7 +84,7 @@ function App() {
       <div>
         <button 
           className="mode-toggle-btn"
-          onClick={handleResetMode}
+          onClick={handleSwitchMode}
           title="Switch to Player Mode"
         >
           📱 Switch to Player
@@ -95,7 +97,7 @@ function App() {
       <div>
         <button 
           className="mode-toggle-btn"
-          onClick={handleResetMode}
+          onClick={handleSwitchMode}
           title="Switch to Host Mode"
         >
           🖥️ Switch to Host
