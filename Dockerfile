@@ -35,11 +35,12 @@ RUN npm install --only=production
 # Configure nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Copy start script and make it executable
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Expose port
 EXPOSE 80
 
 # Start both nginx and backend
-COPY start.sh /start.sh
-RUN chmod +x /start.sh
-
-CMD ["/start.sh"]
+CMD ["/app/start.sh"]

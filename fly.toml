@@ -1,10 +1,16 @@
 # fly.toml app configuration file generated for fake-out-game
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 
+# The name of your Fly.io app. This must be unique across all Fly.io apps.
+# If you are getting errors related to app name, try changing this to something unique.
 app = 'fake-out-game'
+# The primary region for your app. Choose a region closest to your users for best performance.
+# See https://fly.io/docs/reference/regions/ for available regions.
 primary_region = 'yyz'
 
 [build]
+  # Use the Dockerfile in the root of the repository.
+  # If you have a custom Dockerfile path, specify it here, e.g., dockerfile = "path/to/Dockerfile"
 
 [env]
   NODE_ENV = 'production'
