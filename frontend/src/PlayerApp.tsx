@@ -19,7 +19,7 @@ interface GameState {
     isHost: boolean;
   };
   currentQuestion?: string;
-  isImpostor?: boolean;
+  isFake?: boolean;
   timer?: number;
   scores?: Array<{
     userId: string;
@@ -27,12 +27,12 @@ interface GameState {
     score: number;
   }>;
   lastResult?: {
-    impostorId: string;
-    impostorCaught: boolean;
+    fakeId: string;
+    fakeCaught: boolean;
   };
 }
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
 
 function PlayerApp() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -95,15 +95,15 @@ function PlayerApp() {
       setGameState(prev => ({
         ...prev,
         currentQuestion: data.text,
-        isImpostor: false
+        isFake: false
       }));
     });
 
-    newSocket.on('prompt:impostor', (data) => {
+    newSocket.on('prompt:fake', (data) => {
       setGameState(prev => ({
         ...prev,
         currentQuestion: data.text,
-        isImpostor: true
+        isFake: true
       }));
     });
 
@@ -133,8 +133,8 @@ function PlayerApp() {
         state: 'results',
         scores: data.scores,
         lastResult: {
-          impostorId: data.impostorId,
-          impostorCaught: data.impostorCaught
+          fakeId: data.fakeId,
+          fakeCaught: data.fakeCaught
         }
       }));
       setCountdown(5); // Show results for 5 seconds
@@ -226,7 +226,7 @@ function PlayerApp() {
     return (
       <PlayerAnswerScreen
         question={gameState.currentQuestion!}
-        isImpostor={gameState.isImpostor!}
+        isFake={gameState.isFake!}
         players={gameState.room!.players}
         selectedAnswer={selectedAnswer}
         onSelectAnswer={setSelectedAnswer}
@@ -304,7 +304,7 @@ function PlayerLandingScreen({ onJoinRoom, error }: { onJoinRoom: (pin: string, 
   return (
     <div className="screen">
       <div className="container">
-        <h1 className="title">Who's the Impostor?</h1>
+        <h1 className="title">Fake Out</h1>
         
         <div className="player-badge">
           📱 Player Screen - Perfect for Phone
@@ -380,7 +380,7 @@ function PlayerLobbyScreen({
 
 function PlayerAnswerScreen({
   question,
-  isImpostor,
+  isFake,
   players,
   selectedAnswer,
   onSelectAnswer,
@@ -389,7 +389,7 @@ function PlayerAnswerScreen({
   playerName
 }: {
   question: string;
-  isImpostor: boolean;
+  isFake: boolean;
   players: Player[];
   selectedAnswer: string;
   onSelectAnswer: (id: string) => void;
@@ -409,9 +409,9 @@ function PlayerAnswerScreen({
         
         {timer && <div className="timer">Time: {timer}s</div>}
         
-        <div className={`question-container ${isImpostor ? 'impostor' : 'group'}`}>
+        <div className={`question-container ${isFake ? 'fake' : 'group'}`}>
           <h2>{question}</h2>
-          {/* Hide impostor badge during answering so impostor doesn't know they have different question */}
+          {/* Hide fake badge during answering so fake doesn't know they have different question */}
         </div>
         
         <div className="players-grid">
@@ -460,7 +460,7 @@ function PlayerDiscussionScreen({
         <div className="discussion-content">
           <h2>Discussion Phase</h2>
           <p className="discussion-instruction">
-            Discuss your answers and try to figure out who the impostor is!
+            Discuss your answers and try to figure out who the fake is!
           </p>
           
           <div className="discussion-tips">
@@ -507,7 +507,7 @@ function PlayerVotingScreen({
         
         {timer && <div className="timer voting-timer">Voting Time: {timer}s</div>}
         
-        <h2>Who is the impostor?</h2>
+        <h2>Who is the fake?</h2>
         
         <div className="players-grid">
           {players.map(player => (
@@ -540,11 +540,11 @@ function PlayerResultsScreen({
   timer
 }: {
   scores: Array<{ userId: string; displayName: string; score: number }>;
-  lastResult: { impostorId: string; impostorCaught: boolean };
+  lastResult: { fakeId: string; fakeCaught: boolean };
   players: Player[];
   timer?: number;
 }) {
-  const impostor = players.find(p => p.id === lastResult.impostorId);
+  const fake = players.find(p => p.id === lastResult.fakeId);
   
   return (
     <div className="screen">
@@ -553,9 +553,9 @@ function PlayerResultsScreen({
         <h2>Round Results</h2>
         
         <div className="result-reveal">
-          <p>The impostor was: <strong>{impostor?.displayName}</strong></p>
-          <p className={lastResult.impostorCaught ? 'success' : 'failure'}>
-            {lastResult.impostorCaught ? '✅ Impostor caught!' : '❌ Impostor escaped!'}
+          <p>The fake was: <strong>{fake?.displayName}</strong></p>
+          <p className={lastResult.fakeCaught ? 'success' : 'failure'}>
+            {lastResult.fakeCaught ? '✅ Fake caught!' : '❌ Fake escaped!'}
           </p>
         </div>
         

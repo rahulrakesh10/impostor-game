@@ -1,0 +1,31 @@
+# fly.toml app configuration file generated for fake-out-game
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+
+app = 'fake-out-game'
+primary_region = 'yyz'
+
+[build]
+
+[env]
+  NODE_ENV = 'production'
+  PORT = '3001'
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    grace_period = '10s'
+    interval = '30s'
+    method = 'GET'
+    timeout = '5s'
+    path = '/'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 256

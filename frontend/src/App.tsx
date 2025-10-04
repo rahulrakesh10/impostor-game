@@ -49,7 +49,7 @@ function App() {
   return (
     <div className="screen">
       <div className="container">
-        <h1 className="title">Who's the Impostor?</h1>
+        <h1 className="title">Fake Out</h1>
         
           <div className="mode-selector-screen">
             <h2>Choose Your Role</h2>

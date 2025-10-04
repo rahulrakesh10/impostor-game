@@ -26,9 +26,9 @@ interface Room {
   state: 'lobby' | 'answering' | 'discussing' | 'voting' | 'results' | 'ended';
   currentRound: number;
   currentRoundData?: {
-    impostorId: string;
+    fakeId: string;
     groupQuestion: string;
-    impostorQuestion: string;
+    fakeQuestion: string;
     answers: Map<string, string>;
     votes: Map<string, string>;
   };
@@ -39,7 +39,7 @@ interface Room {
 interface Question {
   id: string;
   text: string;
-  type: 'group' | 'impostor';
+  type: 'group' | 'fake';
   tags?: string[];
 }
 
@@ -47,115 +47,115 @@ interface Question {
 const SAMPLE_QUESTIONS: Question[] = [
   // Personality & Humor
   { id: '1', text: 'Who is the funniest?', type: 'group', tags: ['personality', 'humor'] },
-  { id: '2', text: 'Who is the most serious?', type: 'impostor', tags: ['personality', 'humor'] },
+  { id: '2', text: 'Who is the most serious?', type: 'fake', tags: ['personality', 'humor'] },
   { id: '3', text: 'Who tells the best jokes?', type: 'group', tags: ['personality', 'humor'] },
-  { id: '4', text: 'Who tells the worst jokes?', type: 'impostor', tags: ['personality', 'humor'] },
+  { id: '4', text: 'Who tells the worst jokes?', type: 'fake', tags: ['personality', 'humor'] },
   { id: '5', text: 'Who laughs the loudest?', type: 'group', tags: ['personality', 'humor'] },
-  { id: '6', text: 'Who laughs the quietest?', type: 'impostor', tags: ['personality', 'humor'] },
+  { id: '6', text: 'Who laughs the quietest?', type: 'fake', tags: ['personality', 'humor'] },
   { id: '7', text: 'Who has the most contagious laugh?', type: 'group', tags: ['personality', 'humor'] },
-  { id: '8', text: 'Who has the most awkward laugh?', type: 'impostor', tags: ['personality', 'humor'] },
+  { id: '8', text: 'Who has the most awkward laugh?', type: 'fake', tags: ['personality', 'humor'] },
   { id: '9', text: 'Who makes awkward situations funny?', type: 'group', tags: ['personality', 'humor'] },
-  { id: '10', text: 'Who makes funny situations awkward?', type: 'impostor', tags: ['personality', 'humor'] },
+  { id: '10', text: 'Who makes funny situations awkward?', type: 'fake', tags: ['personality', 'humor'] },
 
   // School / Work
   { id: '11', text: 'Who is the most hardworking?', type: 'group', tags: ['school', 'work'] },
-  { id: '12', text: 'Who is the laziest?', type: 'impostor', tags: ['school', 'work'] },
+  { id: '12', text: 'Who is the laziest?', type: 'fake', tags: ['school', 'work'] },
   { id: '13', text: 'Who procrastinates the most?', type: 'group', tags: ['school', 'work'] },
-  { id: '14', text: 'Who always finishes things early?', type: 'impostor', tags: ['school', 'work'] },
+  { id: '14', text: 'Who always finishes things early?', type: 'fake', tags: ['school', 'work'] },
   { id: '15', text: 'Who is most likely to forget homework?', type: 'group', tags: ['school', 'work'] },
-  { id: '16', text: 'Who never forgets anything?', type: 'impostor', tags: ['school', 'work'] },
+  { id: '16', text: 'Who never forgets anything?', type: 'fake', tags: ['school', 'work'] },
   { id: '17', text: 'Who gives the best presentations?', type: 'group', tags: ['school', 'work'] },
-  { id: '18', text: 'Who is most afraid of public speaking?', type: 'impostor', tags: ['school', 'work'] },
+  { id: '18', text: 'Who is most afraid of public speaking?', type: 'fake', tags: ['school', 'work'] },
   { id: '19', text: 'Who would be the best teacher?', type: 'group', tags: ['school', 'work'] },
-  { id: '20', text: 'Who would be the worst teacher?', type: 'impostor', tags: ['school', 'work'] },
+  { id: '20', text: 'Who would be the worst teacher?', type: 'fake', tags: ['school', 'work'] },
 
   // Everyday Life
   { id: '21', text: 'Who is the most organized?', type: 'group', tags: ['lifestyle'] },
-  { id: '22', text: 'Who is the messiest?', type: 'impostor', tags: ['lifestyle'] },
+  { id: '22', text: 'Who is the messiest?', type: 'fake', tags: ['lifestyle'] },
   { id: '23', text: 'Who is the best cook?', type: 'group', tags: ['lifestyle'] },
-  { id: '24', text: 'Who burns water when cooking?', type: 'impostor', tags: ['lifestyle'] },
+  { id: '24', text: 'Who burns water when cooking?', type: 'fake', tags: ['lifestyle'] },
   { id: '25', text: 'Who is most likely to oversleep?', type: 'group', tags: ['lifestyle'] },
-  { id: '26', text: 'Who is always the first one awake?', type: 'impostor', tags: ['lifestyle'] },
+  { id: '26', text: 'Who is always the first one awake?', type: 'fake', tags: ['lifestyle'] },
   { id: '27', text: 'Who spends the most time on their phone?', type: 'group', tags: ['lifestyle'] },
-  { id: '28', text: 'Who uses their phone the least?', type: 'impostor', tags: ['lifestyle'] },
+  { id: '28', text: 'Who uses their phone the least?', type: 'fake', tags: ['lifestyle'] },
 
   // Social Life
   { id: '29', text: 'Who is the most talkative?', type: 'group', tags: ['social'] },
-  { id: '30', text: 'Who is the quietest?', type: 'impostor', tags: ['social'] },
+  { id: '30', text: 'Who is the quietest?', type: 'fake', tags: ['social'] },
   { id: '31', text: 'Who gives the best advice?', type: 'group', tags: ['social'] },
-  { id: '32', text: 'Who gives the worst advice?', type: 'impostor', tags: ['social'] },
+  { id: '32', text: 'Who gives the worst advice?', type: 'fake', tags: ['social'] },
   { id: '33', text: 'Who is the best listener?', type: 'group', tags: ['social'] },
-  { id: '34', text: 'Who interrupts people the most?', type: 'impostor', tags: ['social'] },
+  { id: '34', text: 'Who interrupts people the most?', type: 'fake', tags: ['social'] },
   { id: '35', text: 'Who is the life of the party?', type: 'group', tags: ['social'] },
-  { id: '36', text: 'Who leaves parties first?', type: 'impostor', tags: ['social'] },
+  { id: '36', text: 'Who leaves parties first?', type: 'fake', tags: ['social'] },
 
   // Adventure & Risk
   { id: '37', text: 'Who would survive a zombie apocalypse?', type: 'group', tags: ['adventure'] },
-  { id: '38', text: 'Who would be first eliminated in a zombie apocalypse?', type: 'impostor', tags: ['adventure'] },
+  { id: '38', text: 'Who would be first eliminated in a zombie apocalypse?', type: 'fake', tags: ['adventure'] },
   { id: '39', text: 'Who would get lost on a trip?', type: 'group', tags: ['adventure'] },
-  { id: '40', text: 'Who has the best sense of direction?', type: 'impostor', tags: ['adventure'] },
+  { id: '40', text: 'Who has the best sense of direction?', type: 'fake', tags: ['adventure'] },
   { id: '41', text: 'Who would try the weirdest food?', type: 'group', tags: ['adventure'] },
-  { id: '42', text: 'Who is the pickiest eater?', type: 'impostor', tags: ['adventure'] },
+  { id: '42', text: 'Who is the pickiest eater?', type: 'fake', tags: ['adventure'] },
   { id: '43', text: 'Who is most likely to go skydiving?', type: 'group', tags: ['adventure'] },
-  { id: '44', text: 'Who is most afraid of heights?', type: 'impostor', tags: ['adventure'] },
+  { id: '44', text: 'Who is most afraid of heights?', type: 'fake', tags: ['adventure'] },
   { id: '45', text: 'Who is the most spontaneous?', type: 'group', tags: ['adventure'] },
-  { id: '46', text: 'Who plans everything in advance?', type: 'impostor', tags: ['adventure'] },
+  { id: '46', text: 'Who plans everything in advance?', type: 'fake', tags: ['adventure'] },
 
   // Entertainment
   { id: '47', text: 'Who knows the most about movies?', type: 'group', tags: ['entertainment'] },
-  { id: '48', text: 'Who has seen the fewest movies?', type: 'impostor', tags: ['entertainment'] },
+  { id: '48', text: 'Who has seen the fewest movies?', type: 'fake', tags: ['entertainment'] },
   { id: '49', text: 'Who is most likely to binge-watch a show in one day?', type: 'group', tags: ['entertainment'] },
-  { id: '50', text: 'Who watches the least TV?', type: 'impostor', tags: ['entertainment'] },
+  { id: '50', text: 'Who watches the least TV?', type: 'fake', tags: ['entertainment'] },
   { id: '51', text: 'Who is the biggest gamer?', type: 'group', tags: ['entertainment'] },
-  { id: '52', text: 'Who has never touched a video game?', type: 'impostor', tags: ['entertainment'] },
+  { id: '52', text: 'Who has never touched a video game?', type: 'fake', tags: ['entertainment'] },
   { id: '53', text: 'Who sings the loudest in the car?', type: 'group', tags: ['entertainment'] },
-  { id: '54', text: 'Who refuses to sing along?', type: 'impostor', tags: ['entertainment'] },
+  { id: '54', text: 'Who refuses to sing along?', type: 'fake', tags: ['entertainment'] },
   { id: '55', text: 'Who always picks the best music?', type: 'group', tags: ['entertainment'] },
-  { id: '56', text: 'Who has the worst taste in music?', type: 'impostor', tags: ['entertainment'] },
+  { id: '56', text: 'Who has the worst taste in music?', type: 'fake', tags: ['entertainment'] },
 
   // Embarrassing / Silly
   { id: '57', text: 'Who trips the most?', type: 'group', tags: ['silly'] },
-  { id: '58', text: 'Who has the best balance?', type: 'impostor', tags: ['silly'] },
+  { id: '58', text: 'Who has the best balance?', type: 'fake', tags: ['silly'] },
   { id: '59', text: 'Who forgets names the most?', type: 'group', tags: ['silly'] },
-  { id: '60', text: 'Who remembers everyone\'s name?', type: 'impostor', tags: ['silly'] },
+  { id: '60', text: 'Who remembers everyone\'s name?', type: 'fake', tags: ['silly'] },
   { id: '61', text: 'Who laughs at their own jokes the most?', type: 'group', tags: ['silly'] },
-  { id: '62', text: 'Who never finds their own jokes funny?', type: 'impostor', tags: ['silly'] },
+  { id: '62', text: 'Who never finds their own jokes funny?', type: 'fake', tags: ['silly'] },
   { id: '63', text: 'Who takes the longest selfies?', type: 'group', tags: ['silly'] },
-  { id: '64', text: 'Who hates taking photos?', type: 'impostor', tags: ['silly'] },
+  { id: '64', text: 'Who hates taking photos?', type: 'fake', tags: ['silly'] },
   { id: '65', text: 'Who is most likely to say something embarrassing in public?', type: 'group', tags: ['silly'] },
-  { id: '66', text: 'Who thinks before they speak?', type: 'impostor', tags: ['silly'] },
+  { id: '66', text: 'Who thinks before they speak?', type: 'fake', tags: ['silly'] },
 
   // Relationships & Personality
   { id: '67', text: 'Who is the most romantic?', type: 'group', tags: ['personality'] },
-  { id: '68', text: 'Who is the least romantic?', type: 'impostor', tags: ['personality'] },
+  { id: '68', text: 'Who is the least romantic?', type: 'fake', tags: ['personality'] },
   { id: '69', text: 'Who gives the best compliments?', type: 'group', tags: ['personality'] },
-  { id: '70', text: 'Who never compliments anyone?', type: 'impostor', tags: ['personality'] },
+  { id: '70', text: 'Who never compliments anyone?', type: 'fake', tags: ['personality'] },
   { id: '71', text: 'Who is the most competitive?', type: 'group', tags: ['personality'] },
-  { id: '72', text: 'Who doesn\'t care about winning?', type: 'impostor', tags: ['personality'] },
+  { id: '72', text: 'Who doesn\'t care about winning?', type: 'fake', tags: ['personality'] },
   { id: '73', text: 'Who is the most dramatic?', type: 'group', tags: ['personality'] },
-  { id: '74', text: 'Who is the most chill?', type: 'impostor', tags: ['personality'] },
+  { id: '74', text: 'Who is the most chill?', type: 'fake', tags: ['personality'] },
 
   // Misc / Random
   { id: '75', text: 'Who would be the best president/leader?', type: 'group', tags: ['random'] },
-  { id: '76', text: 'Who would be the worst leader?', type: 'impostor', tags: ['random'] },
+  { id: '76', text: 'Who would be the worst leader?', type: 'fake', tags: ['random'] },
   { id: '77', text: 'Who is most likely to move abroad?', type: 'group', tags: ['random'] },
-  { id: '78', text: 'Who will never leave their hometown?', type: 'impostor', tags: ['random'] },
+  { id: '78', text: 'Who will never leave their hometown?', type: 'fake', tags: ['random'] },
   { id: '79', text: 'Who is most likely to become famous?', type: 'group', tags: ['random'] },
-  { id: '80', text: 'Who prefers to stay anonymous?', type: 'impostor', tags: ['random'] },
+  { id: '80', text: 'Who prefers to stay anonymous?', type: 'fake', tags: ['random'] },
   { id: '81', text: 'Who is the most creative?', type: 'group', tags: ['random'] },
-  { id: '82', text: 'Who thinks inside the box?', type: 'impostor', tags: ['random'] },
+  { id: '82', text: 'Who thinks inside the box?', type: 'fake', tags: ['random'] },
   { id: '83', text: 'Who is the best problem-solver?', type: 'group', tags: ['random'] },
-  { id: '84', text: 'Who creates more problems than they solve?', type: 'impostor', tags: ['random'] },
+  { id: '84', text: 'Who creates more problems than they solve?', type: 'fake', tags: ['random'] },
   { id: '85', text: 'Who would win a trivia contest?', type: 'group', tags: ['random'] },
-  { id: '86', text: 'Who knows the least random facts?', type: 'impostor', tags: ['random'] },
+  { id: '86', text: 'Who knows the least random facts?', type: 'fake', tags: ['random'] },
   { id: '87', text: 'Who is the best dancer?', type: 'group', tags: ['random'] },
-  { id: '88', text: 'Who has two left feet?', type: 'impostor', tags: ['random'] },
+  { id: '88', text: 'Who has two left feet?', type: 'fake', tags: ['random'] },
   { id: '89', text: 'Who would be a stand-up comedian?', type: 'group', tags: ['random'] },
-  { id: '90', text: 'Who would bomb on stage?', type: 'impostor', tags: ['random'] },
+  { id: '90', text: 'Who would bomb on stage?', type: 'fake', tags: ['random'] },
   { id: '91', text: 'Who is the best at keeping secrets?', type: 'group', tags: ['random'] },
-  { id: '92', text: 'Who can\'t keep a secret to save their life?', type: 'impostor', tags: ['random'] },
+  { id: '92', text: 'Who can\'t keep a secret to save their life?', type: 'fake', tags: ['random'] },
   { id: '93', text: 'Who would survive without the internet the longest?', type: 'group', tags: ['random'] },
-  { id: '94', text: 'Who would die without WiFi?', type: 'impostor', tags: ['random'] },
+  { id: '94', text: 'Who would die without WiFi?', type: 'fake', tags: ['random'] },
 ];
 
 // In-memory storage (replace with Redis in production)
@@ -166,7 +166,9 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Frontend URL
+    origin: process.env.NODE_ENV === 'production' 
+      ? ["https://your-app-name.fly.dev", "https://your-custom-domain.com"] // Replace with your actual domains
+      : "http://localhost:5173",
     methods: ["GET", "POST"]
   }
 });
@@ -179,15 +181,15 @@ function generatePin(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Get random question pair (group + impostor) with diversity to avoid obvious opposites
-function getDiverseQuestionPair(): { group: Question; impostor: Question } {
+// Get random question pair (group + fake) with diversity to avoid obvious opposites
+function getDiverseQuestionPair(): { group: Question; fake: Question } {
   const groupQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'group');
-  const impostorQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'impostor');
+  const fakeQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'fake');
 
   const groupQuestion = groupQuestions[Math.floor(Math.random() * groupQuestions.length)];
 
-  // Prefer impostor questions that are NOT the sequential opposite and have different tags
-  const preferredPool = impostorQuestions.filter(q => {
+  // Prefer fake questions that are NOT the sequential opposite and have different tags
+  const preferredPool = fakeQuestions.filter(q => {
     const notOpposite = Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1;
     const differentTag = groupQuestion.tags && q.tags
       ? !groupQuestion.tags.some(t => (q.tags || []).includes(t))
@@ -195,12 +197,12 @@ function getDiverseQuestionPair(): { group: Question; impostor: Question } {
     return notOpposite && differentTag;
   });
 
-  const fallbackPool = impostorQuestions.filter(q => Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1);
-  const usablePool = preferredPool.length > 0 ? preferredPool : (fallbackPool.length > 0 ? fallbackPool : impostorQuestions);
+  const fallbackPool = fakeQuestions.filter(q => Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1);
+  const usablePool = preferredPool.length > 0 ? preferredPool : (fallbackPool.length > 0 ? fallbackPool : fakeQuestions);
 
-  const impostorQuestion = usablePool[Math.floor(Math.random() * usablePool.length)];
+  const fakeQuestion = usablePool[Math.floor(Math.random() * usablePool.length)];
 
-  return { group: groupQuestion, impostor: impostorQuestion };
+  return { group: groupQuestion, fake: fakeQuestion };
 }
 
 // REST API Routes
@@ -346,9 +348,9 @@ io.on('connection', (socket) => {
           socket.emit('room:update', { players, state: room.state });
           // If a round is active, resend their current prompt
           if (room.state === 'answering' && room.currentRoundData) {
-            const isImpostor = user.id === room.currentRoundData.impostorId;
-            const question = isImpostor ? room.currentRoundData.impostorQuestion : room.currentRoundData.groupQuestion;
-            socket.emit(isImpostor ? 'prompt:impostor' : 'prompt:group', {
+            const isFake = user.id === room.currentRoundData.fakeId;
+            const question = isFake ? room.currentRoundData.fakeQuestion : room.currentRoundData.groupQuestion;
+            socket.emit(isFake ? 'prompt:fake' : 'prompt:group', {
               text: question,
               players
             });
@@ -511,13 +513,13 @@ function startRound(room: Room) {
   console.log(`Starting round ${room.currentRound} for room ${room.pin}`);
   
   const players = Array.from(room.players.keys());
-  const impostorId = players[Math.floor(Math.random() * players.length)];
-  const { group, impostor } = getDiverseQuestionPair();
+  const fakeId = players[Math.floor(Math.random() * players.length)];
+  const { group, fake } = getDiverseQuestionPair();
   
   room.currentRoundData = {
-    impostorId,
+    fakeId,
     groupQuestion: group.text,
-    impostorQuestion: impostor.text,
+    fakeQuestion: fake.text,
     answers: new Map(),
     votes: new Map()
   };
@@ -536,10 +538,10 @@ function startRound(room: Room) {
     const user = room.players.get(playerId);
     if (!user) return;
     
-    const isImpostor = playerId === impostorId;
-    const question = isImpostor ? impostor.text : group.text;
+    const isFake = playerId === fakeId;
+    const question = isFake ? fake.text : group.text;
     
-    io.to(user.socketId).emit(isImpostor ? 'prompt:impostor' : 'prompt:group', {
+    io.to(user.socketId).emit(isFake ? 'prompt:fake' : 'prompt:group', {
       text: question,
       players: Array.from(room.players.values()).map(p => ({
         id: p.id,
@@ -603,7 +605,7 @@ function calculateResults(room: Room) {
   
   console.log(`Calculating results for round ${room.currentRound} in room ${room.pin}`);
   room.state = 'results';
-  const { impostorId, votes } = room.currentRoundData;
+  const { fakeId, votes } = room.currentRoundData;
   
   // Count votes
   const voteCounts = new Map<string, number>();
@@ -622,18 +624,18 @@ function calculateResults(room: Room) {
   }
   
   // Calculate scores
-  const impostorCaught = mostVotedPlayer === impostorId && maxVotes > room.players.size / 2;
+  const fakeCaught = mostVotedPlayer === fakeId && maxVotes > room.players.size / 2;
   
-  if (impostorCaught) {
-    // Everyone except impostor gets +1 point
+  if (fakeCaught) {
+    // Everyone except fake gets +1 point
     for (const playerId of room.players.keys()) {
-      if (playerId !== impostorId) {
+      if (playerId !== fakeId) {
         room.scores.set(playerId, (room.scores.get(playerId) || 0) + 1);
       }
     }
   } else {
-    // Impostor gets +3 points
-    room.scores.set(impostorId, (room.scores.get(impostorId) || 0) + 3);
+    // Fake gets +3 points
+    room.scores.set(fakeId, (room.scores.get(fakeId) || 0) + 3);
   }
   
   // Send results
@@ -644,8 +646,8 @@ function calculateResults(room: Room) {
   }));
   
   io.to(room.pin).emit('round:result', {
-    impostorId,
-    impostorCaught,
+    fakeId,
+    fakeCaught,
     votes: Array.from(votes.entries()),
     scores
   });

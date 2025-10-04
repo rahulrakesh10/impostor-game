@@ -1,13 +1,13 @@
-# 🕵️ Who's the Impostor? Game
+# 🎭 Fake Out Game
 
-A real-time multiplayer party game where players try to identify the impostor among them! Built with React, TypeScript, Node.js, and Socket.IO.
+A real-time multiplayer party game where players try to identify the fake among them! Built with React, TypeScript, Node.js, and Socket.IO.
 
 ## 🎮 Game Overview
 
-**Who's the Impostor?** is a social deduction game where:
-- One player is secretly the "impostor" with a different question
-- Other players work together to identify the impostor
-- Players vote on who they think is the impostor
+**Fake Out** is a social deduction game where:
+- One player is secretly the "fake" with a different question
+- Other players work together to identify the fake
+- Players vote on who they think is the fake
 - Points are awarded based on correct guesses
 
 ## ✨ Features
@@ -29,7 +29,7 @@ A real-time multiplayer party game where players try to identify the impostor am
 ### ⚙️ Customizable Settings
 - **Timer controls**: Answer time, discussion time, voting time
 - **Round management**: Number of rounds
-- **Scoring system**: Points for impostor and group
+- **Scoring system**: Points for fake and group
 - **Display options**: Show player names, allow spectators
 - **Theme selection**: Real-time theme switching
 
@@ -48,8 +48,8 @@ A real-time multiplayer party game where players try to identify the impostor am
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/rahulrakesh10/impostor-game.git
-   cd impostor-game
+   git clone https://github.com/rahulrakesh10/fake-out-game.git
+   cd fake-out-game
    ```
 
 2. **Install backend dependencies**
@@ -99,14 +99,14 @@ A real-time multiplayer party game where players try to identify the impostor am
 2. **Enter Name**: Choose your display name
 3. **Answer Questions**: Select your answer during the answering phase
 4. **Discuss**: Talk with other players during discussion time
-5. **Vote**: Vote for who you think is the impostor
+5. **Vote**: Vote for who you think is the fake
 6. **See Results**: View scores and game progression
 
 ## 🎯 Game Phases
 
 ### 1. **Answering Phase** (30 seconds default)
 - All players answer their question
-- Impostor gets a different question (unknown to them)
+- Fake gets a different question (unknown to them)
 - Host can see all answers in real-time
 
 ### 2. **Discussion Phase** (120 seconds default)
@@ -115,12 +115,12 @@ A real-time multiplayer party game where players try to identify the impostor am
 - Host can see discussion progress
 
 ### 3. **Voting Phase** (15 seconds default)
-- Players vote for who they think is the impostor
+- Players vote for who they think is the fake
 - Real-time vote counting
 - Results revealed immediately
 
 ### 4. **Results Phase**
-- Show who was the impostor
+- Show who was the fake
 - Display scores and leaderboard
 - Move to next round or end game
 
@@ -131,7 +131,7 @@ A real-time multiplayer party game where players try to identify the impostor am
 - **Discussion Timer**: 30-300 seconds  
 - **Vote Timer**: 5-30 seconds
 - **Rounds**: 1-10 rounds
-- **Impostor Points**: 1-10 points
+- **Fake Points**: 1-10 points
 - **Group Points**: 1-5 points
 
 ### Themes
@@ -165,7 +165,7 @@ A real-time multiplayer party game where players try to identify the impostor am
 ## 📁 Project Structure
 
 ```
-impostor-game/
+fake-out-game/
 ├── backend/
 │   ├── src/
 │   │   └── server.ts          # Main server file
@@ -245,4 +245,4 @@ If you encounter any issues or have questions:
 
 ---
 
-**Have fun playing Who's the Impostor! 🎉**
+**Have fun playing Fake Out! 🎉**

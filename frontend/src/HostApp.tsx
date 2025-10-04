@@ -19,7 +19,7 @@ interface GameState {
     isHost: boolean;
   };
   currentQuestion?: string;
-  isImpostor?: boolean;
+  isFake?: boolean;
   timer?: number;
   scores?: Array<{
     userId: string;
@@ -27,8 +27,8 @@ interface GameState {
     score: number;
   }>;
   lastResult?: {
-    impostorId: string;
-    impostorCaught: boolean;
+    fakeId: string;
+    fakeCaught: boolean;
   };
 }
 
@@ -40,11 +40,11 @@ interface GameSettings {
   theme: 'default' | 'dark' | 'neon' | 'pastel';
   showPlayerNames: boolean;
   allowSpectators: boolean;
-  impostorPoints: number;
+  fakePoints: number;
   groupPoints: number;
 }
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
 
 function HostApp() {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -66,7 +66,7 @@ function HostApp() {
     theme: 'default',
     showPlayerNames: true,
     allowSpectators: false,
-    impostorPoints: 3,
+    fakePoints: 3,
     groupPoints: 1
   });
 
@@ -114,15 +114,15 @@ function HostApp() {
       setGameState(prev => ({
         ...prev,
         currentQuestion: data.text,
-        isImpostor: false
+        isFake: false
       }));
     });
 
-    newSocket.on('prompt:impostor', (data) => {
+    newSocket.on('prompt:fake', (data) => {
       setGameState(prev => ({
         ...prev,
         currentQuestion: data.text,
-        isImpostor: true
+        isFake: true
       }));
     });
 
@@ -154,8 +154,8 @@ function HostApp() {
         state: 'results',
         scores: data.scores,
         lastResult: {
-          impostorId: data.impostorId,
-          impostorCaught: data.impostorCaught
+          fakeId: data.fakeId,
+          fakeCaught: data.fakeCaught
         }
       }));
       setCountdown(5); // Show results for 5 seconds
@@ -266,7 +266,7 @@ function HostApp() {
         question={gameState.currentQuestion!}
         players={gameState.room!.players}
         timer={countdown}
-        isImpostor={gameState.isImpostor!}
+        isFake={gameState.isFake!}
         playerAnswers={playerAnswers}
       />
     );
@@ -318,7 +318,7 @@ function HostLandingScreen({ onCreateRoom }: { onCreateRoom: () => void }) {
   return (
     <div className="screen">
       <div className="container">
-        <h1 className="title">Who's the Impostor?</h1>
+        <h1 className="title">Fake Out</h1>
         
         <div className="host-badge">
           🖥️ Host Screen - Perfect for iPad/Laptop
@@ -405,13 +405,13 @@ function HostAnswerScreen({
   question,
   players,
   timer,
-  isImpostor,
+  isFake,
   playerAnswers
 }: {
   question: string;
   players: Player[];
   timer: number;
-  isImpostor: boolean;
+  isFake: boolean;
   playerAnswers: Array<{
     playerId: string;
     playerName: string;
@@ -434,10 +434,10 @@ function HostAnswerScreen({
           </div>
         </div>
         
-        <div className={`question-container ${isImpostor ? 'impostor' : 'group'}`}>
+        <div className={`question-container ${isFake ? 'fake' : 'group'}`}>
           <h3>Current Question:</h3>
           <p className="question-text">{question}</p>
-          {isImpostor && <div className="impostor-badge">Impostor Question</div>}
+          {isFake && <div className="fake-badge">Fake Question</div>}
         </div>
         
         <div className="players-overview">
@@ -497,7 +497,7 @@ function HostDiscussionScreen({
         
         <div className="discussion-overview">
           <h3>💬 Discussion in Progress</h3>
-          <p>Players are discussing their answers and trying to figure out who the impostor is!</p>
+          <p>Players are discussing their answers and trying to figure out who the fake is!</p>
         </div>
         
         <div className="answers-summary">
@@ -554,7 +554,7 @@ function HostVotingScreen({
         
         <div className="voting-overview">
           <h3>🗳️ Voting in Progress</h3>
-          <p>Players are voting on who they think is the impostor!</p>
+          <p>Players are voting on who they think is the fake!</p>
         </div>
         
         <div className="players-overview">
@@ -581,11 +581,11 @@ function HostResultsScreen({
   timer
 }: {
   scores: Array<{ userId: string; displayName: string; score: number }>;
-  lastResult: { impostorId: string; impostorCaught: boolean };
+  lastResult: { fakeId: string; fakeCaught: boolean };
   players: Player[];
   timer?: number;
 }) {
-  const impostor = players.find(p => p.id === lastResult.impostorId);
+  const fake = players.find(p => p.id === lastResult.fakeId);
   
   return (
     <div className="screen">
@@ -600,13 +600,13 @@ function HostResultsScreen({
         </div>
         
         <div className="result-reveal">
-          <h3>🎭 The Impostor Was:</h3>
-          <div className="impostor-reveal">
-            <div className="impostor-avatar">🎭</div>
-            <span className="impostor-name">{impostor?.displayName}</span>
+          <h3>🎭 The Fake Was:</h3>
+          <div className="fake-reveal">
+            <div className="fake-avatar">🎭</div>
+            <span className="fake-name">{fake?.displayName}</span>
           </div>
-          <p className={lastResult.impostorCaught ? 'success' : 'failure'}>
-            {lastResult.impostorCaught ? '✅ Impostor Caught!' : '❌ Impostor Escaped!'}
+          <p className={lastResult.fakeCaught ? 'success' : 'failure'}>
+            {lastResult.fakeCaught ? '✅ Fake Caught!' : '❌ Fake Escaped!'}
           </p>
         </div>
         
@@ -720,18 +720,18 @@ function GameSettingsPanel({
             />
           </div>
           <div className="setting-item">
-            <label>Impostor Points (when not caught):</label>
+            <label>Fake Points (when not caught):</label>
             <input
               type="number"
               min="1"
               max="10"
-              value={settings.impostorPoints}
-              onChange={(e) => onUpdateSettings({ impostorPoints: parseInt(e.target.value) })}
+              value={settings.fakePoints}
+              onChange={(e) => onUpdateSettings({ fakePoints: parseInt(e.target.value) })}
               className="setting-input"
             />
           </div>
           <div className="setting-item">
-            <label>Group Points (when impostor caught):</label>
+            <label>Group Points (when fake caught):</label>
             <input
               type="number"
               min="1"

@@ -1,7 +1,7 @@
 {
-  "name": "impostor-backend",
+  "name": "fake-out-backend",
   "version": "1.0.0",
-  "description": "Backend server for Who's the Impostor game",
+  "description": "Backend server for Fake Out game",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
