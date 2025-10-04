@@ -32,7 +32,8 @@ interface GameState {
   };
 }
 
-const SOCKET_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+// Use relative URL for production, localhost for development
+const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
 function PlayerApp() {
   const [socket, setSocket] = useState<Socket | null>(null);

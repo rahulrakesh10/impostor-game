@@ -44,7 +44,8 @@ interface GameSettings {
   groupPoints: number;
 }
 
-const SOCKET_URL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001';
+// Use relative URL for production, localhost for development
+const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
 function HostApp() {
   const [socket, setSocket] = useState<Socket | null>(null);
