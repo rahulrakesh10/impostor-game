@@ -1,16 +1,16 @@
 # Build stage for frontend
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
+COPY frontend/package.json ./
+RUN npm install
 COPY frontend/ .
 RUN npm run build
 
 # Build stage for backend
 FROM node:20-alpine AS backend-builder
 WORKDIR /app/backend
-COPY backend/package*.json ./
-RUN npm ci
+COPY backend/package.json ./
+RUN npm install
 COPY backend/ .
 RUN npm run build
 
@@ -30,7 +30,7 @@ COPY --from=backend-builder /app/backend/package*.json ./backend/
 
 # Install only production dependencies for backend
 WORKDIR /app/backend
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Configure nginx
 COPY nginx.conf /etc/nginx/nginx.conf
