@@ -135,7 +135,8 @@ function HostApp() {
       setGameState(prev => ({
         ...prev,
         state: 'discussing',
-        timer: data.timer
+        timer: data.timer,
+        currentQuestion: data.question
       }));
       setCountdown(data.timer);
     });
@@ -279,6 +280,7 @@ function HostApp() {
         players={gameState.room!.players}
         timer={countdown}
         playerAnswers={playerAnswers}
+        question={gameState.currentQuestion!}
       />
     );
   }
@@ -470,7 +472,8 @@ function HostAnswerScreen({
 function HostDiscussionScreen({
   players,
   timer,
-  playerAnswers
+  playerAnswers,
+  question
 }: {
   players: Player[];
   timer: number;
@@ -480,6 +483,7 @@ function HostDiscussionScreen({
     answerId: string;
     answerName: string;
   }>;
+  question: string;
 }) {
   return (
     <div className="screen">
@@ -498,6 +502,10 @@ function HostDiscussionScreen({
         
         <div className="discussion-overview">
           <h3>💬 Discussion in Progress</h3>
+          <div className="question-display">
+            <h4>Original Question:</h4>
+            <p className="question-text">{question}</p>
+          </div>
           <p>Players are discussing their answers and trying to figure out who the fake is!</p>
         </div>
         

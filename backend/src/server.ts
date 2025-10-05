@@ -562,7 +562,8 @@ function startDiscussion(room: Room) {
   room.state = 'discussing';
   
   io.to(room.pin).emit('discussion:start', {
-    timer: room.settings.discussionTimer
+    timer: room.settings.discussionTimer,
+    question: room.currentRoundData?.groupQuestion
   });
   
   // Start server-side timer sync

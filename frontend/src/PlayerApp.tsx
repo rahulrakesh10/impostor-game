@@ -112,7 +112,8 @@ function PlayerApp() {
       setGameState(prev => ({
         ...prev,
         state: 'discussing',
-        timer: data.timer
+        timer: data.timer,
+        currentQuestion: data.question
       }));
       setCountdown(data.timer);
     });
@@ -243,6 +244,7 @@ function PlayerApp() {
       <PlayerDiscussionScreen
         timer={countdown}
         playerName={gameState.user?.displayName}
+        question={gameState.currentQuestion!}
       />
     );
   }
@@ -441,10 +443,12 @@ function PlayerAnswerScreen({
 
 function PlayerDiscussionScreen({ 
   timer, 
-  playerName 
+  playerName,
+  question
 }: { 
   timer?: number;
   playerName?: string;
+  question: string;
 }) {
   return (
     <div className="screen">
@@ -460,6 +464,12 @@ function PlayerDiscussionScreen({
         
         <div className="discussion-content">
           <h2>Discussion Phase</h2>
+          
+          <div className="question-display">
+            <h3>Original Question:</h3>
+            <p className="question-text">{question}</p>
+          </div>
+          
           <p className="discussion-instruction">
             Discuss your answers and try to figure out who the fake is!
           </p>
