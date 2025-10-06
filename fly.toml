@@ -35,3 +35,9 @@ primary_region = 'yyz'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
+
+# Billing limits to prevent overspending
+[processes]
+  [processes.app]
+    hard_limit = 10
+    soft_limit = 5
