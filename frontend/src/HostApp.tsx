@@ -32,6 +32,10 @@ interface GameState {
   };
 }
 
+export interface HostAppProps {
+  onGameStateChange?: (gameInProgress: boolean) => void;
+}
+
 interface GameSettings {
   answerTimer: number;
   discussionTimer: number;
@@ -47,7 +51,7 @@ interface GameSettings {
 // Use relative URL for production, localhost for development
 const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
-function HostApp() {
+function HostApp({ onGameStateChange }: HostAppProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [gameState, setGameState] = useState<GameState>({ state: 'landing' });
   const [error, setError] = useState<string>('');
@@ -80,6 +84,14 @@ function HostApp() {
       return () => clearTimeout(timer);
     }
   }, [countdown]);
+
+  // Track game state changes to notify parent component
+  useEffect(() => {
+    if (onGameStateChange) {
+      const gameInProgress = gameState.state !== 'landing' && gameState.state !== 'lobby';
+      onGameStateChange(gameInProgress);
+    }
+  }, [gameState.state, onGameStateChange]);
 
   useEffect(() => {
     const newSocket = io(SOCKET_URL);

@@ -1,11 +1,12 @@
 // frontend/src/App.tsx
 import React, { useState, useEffect } from 'react';
-import HostApp from './HostApp';
-import PlayerApp from './PlayerApp';
+import HostApp, { HostAppProps } from './HostApp';
+import PlayerApp, { PlayerAppProps } from './PlayerApp';
 
 function App() {
   const [isHostScreen, setIsHostScreen] = useState<boolean>(false);
   const [showModeSelector, setShowModeSelector] = useState<boolean>(true);
+  const [gameInProgress, setGameInProgress] = useState<boolean>(false);
 
   // Screen size detection for host vs player screens
   useEffect(() => {
@@ -38,6 +39,11 @@ function App() {
   };
 
   const handleSwitchMode = () => {
+    // Prevent mode switching during active games
+    if (gameInProgress) {
+      return;
+    }
+    
     const nextMode = isHostScreen ? 'player' : 'host';
     setIsHostScreen(nextMode === 'host');
     setShowModeSelector(false);
@@ -83,26 +89,30 @@ function App() {
   return (
       <div>
         <button 
-          className="mode-toggle-btn"
+          className={`mode-toggle-btn ${gameInProgress ? 'disabled' : ''}`}
           onClick={handleSwitchMode}
-          title="Switch to Player Mode"
+          title={gameInProgress ? "Cannot switch modes during active game" : "Switch to Player Mode"}
+          disabled={gameInProgress}
         >
           📱 Switch to Player
+          {gameInProgress && <small> (Disabled during game)</small>}
         </button>
-        <HostApp />
+        <HostApp onGameStateChange={setGameInProgress} />
     </div>
   );
   } else {
   return (
       <div>
         <button 
-          className="mode-toggle-btn"
+          className={`mode-toggle-btn ${gameInProgress ? 'disabled' : ''}`}
           onClick={handleSwitchMode}
-          title="Switch to Host Mode"
+          title={gameInProgress ? "Cannot switch modes during active game" : "Switch to Host Mode"}
+          disabled={gameInProgress}
         >
           🖥️ Switch to Host
+          {gameInProgress && <small> (Disabled during game)</small>}
         </button>
-        <PlayerApp />
+        <PlayerApp onGameStateChange={setGameInProgress} />
     </div>
   );
   }

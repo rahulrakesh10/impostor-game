@@ -416,6 +416,9 @@ io.on('connection', (socket) => {
       answerName: room.players.get(answerId)?.displayName
     }));
     
+    console.log('Sending answers update:', answerData);
+    console.log('Current room players:', Array.from(room.players.keys()));
+    
     io.to(pin).emit('answers:update', { answers: answerData });
     
     // Check if all answers received
@@ -473,9 +476,9 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     // Handle player disconnect - remove from rooms
-    for (const [socketId, userId] of userSockets.entries()) {
+    for (const [userId, socketId] of userSockets.entries()) {
       if (socketId === socket.id) {
-        userSockets.delete(socketId);
+        userSockets.delete(userId);
         // Remove from all rooms
         for (const room of rooms.values()) {
           if (room.players.has(userId)) {
