@@ -497,6 +497,10 @@ function PlayerDiscussionScreen({
               🤔 Ask follow-up questions to test their knowledge
             </div>
           </div>
+          
+          <div className="discussion-note">
+            <p>💬 Ask your host to skip to voting when everyone is ready!</p>
+          </div>
         </div>
       </div>
     </div>

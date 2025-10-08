@@ -1493,6 +1493,63 @@ body::before {
   box-shadow: 0 6px 15px rgba(108, 117, 125, 0.3);
 }
 
+/* Skip Button Styles */
+.skip-button {
+  background: linear-gradient(135deg, #f59e0b, #f97316);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.skip-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.4);
+  background: linear-gradient(135deg, #f97316, #ea580c);
+}
+
+.skip-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.host-skip-button {
+  margin-top: 20px;
+  padding: 16px 32px;
+  font-size: 1.1rem;
+}
+
+.discussion-actions {
+  margin-top: 30px;
+  text-align: center;
+}
+
+.discussion-note {
+  margin-top: 30px;
+  padding: 16px;
+  background: rgba(102, 126, 234, 0.1);
+  border-radius: 12px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  text-align: center;
+}
+
+.discussion-note p {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.host-actions {
+  margin-top: 30px;
+  text-align: center;
+}
+
 @keyframes badgePulse {
   0%, 100% {
     transform: scale(1);

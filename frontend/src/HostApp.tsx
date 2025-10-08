@@ -293,6 +293,14 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         timer={countdown}
         playerAnswers={playerAnswers}
         question={gameState.currentQuestion!}
+        onSkipToVoting={() => {
+          if (socket && gameState.room?.pin && gameState.user?.id) {
+            socket.emit('discussion:skip-to-voting', { 
+              pin: gameState.room.pin,
+              hostId: gameState.user.id 
+            });
+          }
+        }}
       />
     );
   }
@@ -485,7 +493,8 @@ function HostDiscussionScreen({
   players,
   timer,
   playerAnswers,
-  question
+  question,
+  onSkipToVoting
 }: {
   players: Player[];
   timer: number;
@@ -496,6 +505,7 @@ function HostDiscussionScreen({
     answerName: string;
   }>;
   question: string;
+  onSkipToVoting?: () => void;
 }) {
   return (
     <div className="screen">
@@ -545,6 +555,16 @@ function HostDiscussionScreen({
               </div>
             ))}
           </div>
+        </div>
+        
+        <div className="host-actions">
+          <button 
+            className="skip-button host-skip-button"
+            onClick={onSkipToVoting}
+            title="Skip to voting phase if players are ready"
+          >
+            ⏭️ Skip to Voting
+          </button>
         </div>
       </div>
     </div>

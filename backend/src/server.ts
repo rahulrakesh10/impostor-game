@@ -34,6 +34,10 @@ interface Room {
   };
   scores: Map<string, number>;
   timerInterval?: NodeJS.Timeout;
+  discussionTimeout?: NodeJS.Timeout;
+  answerTimeout?: NodeJS.Timeout;
+  voteTimeout?: NodeJS.Timeout;
+  resultsTimeout?: NodeJS.Timeout;
 }
 
 interface Question {
@@ -473,6 +477,45 @@ io.on('connection', (socket) => {
     io.to(pin).emit('theme:update', { theme });
   });
 
+  // Skip to voting handler (host only)
+  socket.on('discussion:skip-to-voting', (data) => {
+    const { pin, hostId } = data;
+    const room = rooms.get(pin);
+    
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    // Check if the user is the host
+    if (room.hostUserId !== hostId) {
+      socket.emit('error', { message: 'Only the host can skip to voting' });
+      return;
+    }
+    
+    if (room.state !== 'discussing') {
+      socket.emit('error', { message: 'Not in discussion phase' });
+      return;
+    }
+    
+    console.log('Host skipping to voting for room:', pin);
+    
+    // Clear the discussion timer
+    if (room.timerInterval) {
+      clearInterval(room.timerInterval);
+      room.timerInterval = undefined;
+    }
+    
+    // Clear the discussion timeout
+    if (room.discussionTimeout) {
+      clearTimeout(room.discussionTimeout);
+      room.discussionTimeout = undefined;
+    }
+    
+    // Start voting phase immediately
+    startVoting(room);
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     // Handle player disconnect - remove from rooms
@@ -515,6 +558,12 @@ function startRound(room: Room) {
   room.state = 'answering';
   console.log(`Starting round ${room.currentRound} for room ${room.pin}`);
   
+  // Clear any existing results timeout
+  if (room.resultsTimeout) {
+    clearTimeout(room.resultsTimeout);
+    room.resultsTimeout = undefined;
+  }
+  
   const players = Array.from(room.players.keys());
   const fakeId = players[Math.floor(Math.random() * players.length)];
   const { group, fake } = getDiverseQuestionPair();
@@ -554,15 +603,24 @@ function startRound(room: Room) {
   });
   
   // Start timer for answering phase
-  setTimeout(() => {
+  const answerTimeout = setTimeout(() => {
     if (room.state === 'answering') {
       startDiscussion(room);
     }
   }, room.settings.answerTimer * 1000);
+  
+  // Store the timeout ID for potential early termination
+  room.answerTimeout = answerTimeout;
 }
 
 function startDiscussion(room: Room) {
   room.state = 'discussing';
+  
+  // Clear any existing answer timeout
+  if (room.answerTimeout) {
+    clearTimeout(room.answerTimeout);
+    room.answerTimeout = undefined;
+  }
   
   io.to(room.pin).emit('discussion:start', {
     timer: room.settings.discussionTimer,
@@ -573,15 +631,24 @@ function startDiscussion(room: Room) {
   startTimerSync(room, room.settings.discussionTimer);
   
   // Start timer for discussion phase
-  setTimeout(() => {
+  const discussionTimeout = setTimeout(() => {
     if (room.state === 'discussing') {
       startVoting(room);
     }
   }, room.settings.discussionTimer * 1000);
+  
+  // Store the timeout ID for potential early termination
+  room.discussionTimeout = discussionTimeout;
 }
 
 function startVoting(room: Room) {
   room.state = 'voting';
+  
+  // Clear any existing discussion timeout
+  if (room.discussionTimeout) {
+    clearTimeout(room.discussionTimeout);
+    room.discussionTimeout = undefined;
+  }
   
   const players = Array.from(room.players.values()).map(p => ({
     id: p.id,
@@ -597,11 +664,14 @@ function startVoting(room: Room) {
   startTimerSync(room, room.settings.voteTimer);
   
   // Start timer for voting phase
-  setTimeout(() => {
+  const voteTimeout = setTimeout(() => {
     if (room.state === 'voting') {
       calculateResults(room);
     }
   }, room.settings.voteTimer * 1000);
+  
+  // Store the timeout ID for potential early termination
+  room.voteTimeout = voteTimeout;
 }
 
 function calculateResults(room: Room) {
@@ -609,6 +679,13 @@ function calculateResults(room: Room) {
   
   console.log(`Calculating results for round ${room.currentRound} in room ${room.pin}`);
   room.state = 'results';
+  
+  // Clear any existing vote timeout
+  if (room.voteTimeout) {
+    clearTimeout(room.voteTimeout);
+    room.voteTimeout = undefined;
+  }
+  
   const { fakeId, votes } = room.currentRoundData;
   
   // Count votes
@@ -656,14 +733,20 @@ function calculateResults(room: Room) {
     scores
   });
   
-  // Check if game should end
-  setTimeout(() => {
+  // Start server-side timer sync for results phase
+  startTimerSync(room, 5); // Show results for 5 seconds
+  
+  // Start timer for results phase
+  const resultsTimeout = setTimeout(() => {
     if (room.currentRound >= room.settings.rounds) {
       endGame(room);
     } else {
       startRound(room);
     }
   }, 5000); // Show results for 5 seconds
+  
+  // Store the timeout ID for potential early termination
+  room.resultsTimeout = resultsTimeout;
 }
 
 function endGame(room: Room) {
