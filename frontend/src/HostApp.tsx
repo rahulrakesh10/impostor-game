@@ -53,6 +53,7 @@ const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:
 
 function HostApp({ onGameStateChange }: HostAppProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const [gameState, setGameState] = useState<GameState>({ state: 'landing' });
   const [error, setError] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(0);
@@ -94,8 +95,40 @@ function HostApp({ onGameStateChange }: HostAppProps) {
   }, [gameState.state, onGameStateChange]);
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL);
+    console.log('Connecting to socket at:', SOCKET_URL);
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
     setSocket(newSocket);
+
+    // Connection status handlers
+    newSocket.on('connect', () => {
+      console.log('Socket connected successfully');
+      setSocketConnected(true);
+      setError('');
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      setSocketConnected(false);
+      setError(`Connection failed: ${err.message}`);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      setSocketConnected(false);
+      if (reason === 'io server disconnect') {
+        setError('Connection lost. Please refresh the page.');
+      }
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('Socket reconnected');
+      setSocketConnected(true);
+      setError('');
+    });
 
     // Socket event listeners
     newSocket.on('room:joined', (data) => {
@@ -201,6 +234,16 @@ function HostApp({ onGameStateChange }: HostAppProps) {
     const userId = Math.random().toString(36).substring(7);
     const displayName = 'Host';
     
+    if (!socketConnected) {
+      setError('Not connected to server. Please wait...');
+      return;
+    }
+    
+    if (!socket) {
+      setError('Socket not available. Please refresh the page.');
+      return;
+    }
+    
     try {
       const response = await fetch(`${SOCKET_URL}/api/rooms`, {
         method: 'POST',
@@ -217,7 +260,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
       });
       
       // Host connects but doesn't join as a player
-      socket?.emit('room:host-join', { pin: data.pin, userId, displayName });
+      socket.emit('room:host-join', { pin: data.pin, userId, displayName });
     } catch (err) {
       setError('Failed to create room');
     }
@@ -256,7 +299,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
   }, [gameSettings.theme, socket, gameState.room]);
 
   if (gameState.state === 'landing') {
-    return <HostLandingScreen onCreateRoom={createRoom} />;
+    return <HostLandingScreen onCreateRoom={createRoom} socketConnected={socketConnected} error={error} />;
   }
 
   if (gameState.state === 'lobby') {
@@ -337,7 +380,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
 }
 
 // Host-specific components
-function HostLandingScreen({ onCreateRoom }: { onCreateRoom: () => void }) {
+function HostLandingScreen({ onCreateRoom, socketConnected, error }: { onCreateRoom: () => void; socketConnected: boolean; error?: string }) {
   return (
     <div className="screen">
       <div className="container">
@@ -347,12 +390,34 @@ function HostLandingScreen({ onCreateRoom }: { onCreateRoom: () => void }) {
           🖥️ Host Screen - Perfect for iPad/Laptop
         </div>
         
+        {/* Connection Status */}
+        <div className="connection-status" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+          {socketConnected ? (
+            <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <span>🟢</span>
+              <span>Connected to server</span>
+            </div>
+          ) : (
+            <div style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <span>🟡</span>
+              <span>Connecting to server...</span>
+            </div>
+          )}
+        </div>
+        
+        {error && (
+          <div className="waiting-message" style={{ marginTop: '1rem' }}>
+            <p style={{ color: '#b91c1c' }}>⚠️ {error}</p>
+          </div>
+        )}
+        
         <div className="host-setup">
           <button 
             onClick={onCreateRoom} 
             className="button primary"
+            disabled={!socketConnected}
           >
-            Start a Game
+            {socketConnected ? 'Start a Game' : 'Connecting...'}
           </button>
         </div>
       </div>

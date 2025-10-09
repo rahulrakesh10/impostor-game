@@ -41,6 +41,7 @@ const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:
 
 function PlayerApp({ onGameStateChange }: PlayerAppProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const [gameState, setGameState] = useState<GameState>({ state: 'landing' });
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -67,8 +68,40 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
   }, [gameState.state, onGameStateChange]);
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL);
+    console.log('Connecting to socket at:', SOCKET_URL);
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
     setSocket(newSocket);
+
+    // Connection status handlers
+    newSocket.on('connect', () => {
+      console.log('Socket connected successfully');
+      setSocketConnected(true);
+      setError('');
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket connection error:', err);
+      setSocketConnected(false);
+      setError(`Connection failed: ${err.message}`);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      setSocketConnected(false);
+      if (reason === 'io server disconnect') {
+        setError('Connection lost. Please refresh the page.');
+      }
+    });
+
+    newSocket.on('reconnect', () => {
+      console.log('Socket reconnected');
+      setSocketConnected(true);
+      setError('');
+    });
 
     // Socket event listeners
     newSocket.on('room:joined', (data) => {
@@ -187,9 +220,21 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
     const userId = Math.random().toString(36).substring(7);
     setError('');
     joinContext.current = { userId, displayName, pin };
-    socket?.emit('room:join', { pin, userId, displayName });
+    
+    if (!socketConnected) {
+      setError('Not connected to server. Please wait...');
+      return;
+    }
+    
+    if (!socket) {
+      setError('Socket not available. Please refresh the page.');
+      return;
+    }
+    
+    console.log('Joining room:', pin, 'as:', displayName);
+    socket.emit('room:join', { pin, userId, displayName });
     // In case of slow network/reconnects, proactively identify after connect
-    socket?.emit('user:identify', { userId, pin });
+    socket.emit('user:identify', { userId, pin });
   };
 
   const submitAnswer = () => {
@@ -215,7 +260,7 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
   };
 
   if (gameState.state === 'landing') {
-    return <PlayerLandingScreen onJoinRoom={joinRoom} error={error} />;
+    return <PlayerLandingScreen onJoinRoom={joinRoom} error={error} socketConnected={socketConnected} />;
   }
 
   if (gameState.state === 'lobby') {
@@ -306,7 +351,7 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
 }
 
 // Player-specific components
-function PlayerLandingScreen({ onJoinRoom, error }: { onJoinRoom: (pin: string, name: string) => void; error?: string }) {
+function PlayerLandingScreen({ onJoinRoom, error, socketConnected }: { onJoinRoom: (pin: string, name: string) => void; error?: string; socketConnected: boolean }) {
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
 
@@ -324,6 +369,22 @@ function PlayerLandingScreen({ onJoinRoom, error }: { onJoinRoom: (pin: string, 
         <div className="player-badge">
           📱 Player Screen - Perfect for Phone
         </div>
+        
+        {/* Connection Status */}
+        <div className="connection-status" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+          {socketConnected ? (
+            <div style={{ color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <span>🟢</span>
+              <span>Connected to server</span>
+            </div>
+          ) : (
+            <div style={{ color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <span>🟡</span>
+              <span>Connecting to server...</span>
+            </div>
+          )}
+        </div>
+        
         {error && (
           <div className="waiting-message" style={{ marginTop: '1rem' }}>
             <p style={{ color: '#b91c1c' }}>⚠️ {error}</p>
@@ -356,8 +417,12 @@ function PlayerLandingScreen({ onJoinRoom, error }: { onJoinRoom: (pin: string, 
               maxLength={6}
             />
             
-            <button type="submit" className="button primary">
-              Join Game
+            <button 
+              type="submit" 
+              className="button primary"
+              disabled={!socketConnected}
+            >
+              {socketConnected ? 'Join Game' : 'Connecting...'}
             </button>
           </form>
         </div>
