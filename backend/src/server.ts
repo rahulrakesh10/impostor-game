@@ -171,7 +171,7 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ["https://your-app-name.fly.dev", "https://your-custom-domain.com"] // Replace with your actual domains
+      ? ["https://fakeout.fly.dev", "https://your-custom-domain.com"] // Replace with your actual domains
       : "http://localhost:5173",
     methods: ["GET", "POST"]
   }

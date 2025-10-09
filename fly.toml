@@ -3,7 +3,7 @@
 
 # The name of your Fly.io app. This must be unique across all Fly.io apps.
 # If you are getting errors related to app name, try changing this to something unique.
-app = 'fake-out-game'
+app = 'fakeout'
 # The primary region for your app. Choose a region closest to your users for best performance.
 # See https://fly.io/docs/reference/regions/ for available regions.
 primary_region = 'yyz'
