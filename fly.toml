@@ -23,7 +23,6 @@ primary_region = 'yyz'
   auto_stop_machines = false
   auto_start_machines = true
   min_machines_running = 1
-  processes = ['app']
 
   [[http_service.checks]]
     grace_period = '10s'
@@ -36,9 +35,3 @@ primary_region = 'yyz'
   cpu_kind = 'shared'
   cpus = 1
   memory_mb = 256
-
-# Billing limits to prevent overspending
-[processes]
-  [processes.app]
-    hard_limit = 10
-    soft_limit = 5
