@@ -37,7 +37,7 @@ export interface PlayerAppProps {
 }
 
 // Use relative URL for production, localhost for development
-const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin;
 
 function PlayerApp({ onGameStateChange }: PlayerAppProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
