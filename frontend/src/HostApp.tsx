@@ -259,8 +259,11 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         room: { pin: data.pin, players: [] }
       });
       
-      // Host connects but doesn't join as a player
-      socket.emit('room:host-join', { pin: data.pin, userId, displayName });
+      // Small delay to ensure room is fully created before host joins
+      setTimeout(() => {
+        console.log('Host joining room after creation delay:', data.pin);
+        socket?.emit('room:host-join', { pin: data.pin, userId, displayName });
+      }, 100);
     } catch (err) {
       setError('Failed to create room');
     }

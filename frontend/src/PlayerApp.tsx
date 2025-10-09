@@ -216,7 +216,7 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
     };
   }, []);
 
-  const joinRoom = (pin: string, displayName: string) => {
+  const joinRoom = (pin: string, displayName: string, retryCount = 0) => {
     const userId = Math.random().toString(36).substring(7);
     setError('');
     joinContext.current = { userId, displayName, pin };
@@ -231,10 +231,26 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
       return;
     }
     
-    console.log('Joining room:', pin, 'as:', displayName);
+    console.log(`Joining room: ${pin} as: ${displayName} (attempt ${retryCount + 1})`);
     socket.emit('room:join', { pin, userId, displayName });
     // In case of slow network/reconnects, proactively identify after connect
     socket.emit('user:identify', { userId, pin });
+    
+    // If room not found and this is the first attempt, retry after a short delay
+    if (retryCount === 0) {
+      const retryTimeout = setTimeout(() => {
+        if (gameState.state === 'landing') {
+          console.log('Retrying room join after delay...');
+          joinRoom(pin, displayName, 1);
+        }
+      }, 2000);
+      
+      // Clear timeout if we successfully join
+      const originalOnRoomJoined = socket.listeners('room:joined')[0];
+      socket.once('room:joined', () => {
+        clearTimeout(retryTimeout);
+      });
+    }
   };
 
   const submitAnswer = () => {

@@ -220,6 +220,8 @@ app.post('/api/rooms', (req, res) => {
   const roomId = uuidv4();
   const pin = generatePin();
   
+  console.log(`Creating room with PIN: ${pin} for host: ${hostId}`);
+  
   const room: Room = {
     id: roomId,
     pin,
@@ -237,6 +239,7 @@ app.post('/api/rooms', (req, res) => {
   };
   
   rooms.set(pin, room);
+  console.log(`Room ${pin} created successfully. Total rooms: ${rooms.size}`);
   
   res.json({ roomId, pin });
 });
@@ -269,12 +272,16 @@ io.on('connection', (socket) => {
 
   socket.on('room:join', (data) => {
     const { pin, userId, displayName } = data;
+    console.log(`Player ${displayName} (${userId}) trying to join room ${pin}`);
     const room = rooms.get(pin);
     
     if (!room) {
+      console.log(`Room ${pin} not found. Available rooms:`, Array.from(rooms.keys()));
       socket.emit('error', { message: 'Room not found' });
       return;
     }
+    
+    console.log(`Room ${pin} found. Current players:`, room.players.size);
     
     if (room.state !== 'lobby') {
       socket.emit('error', { message: 'Game already in progress' });
@@ -308,18 +315,24 @@ io.on('connection', (socket) => {
       displayName: p.displayName
     }));
     
+    console.log(`Broadcasting room update to ${pin}. Players:`, players.length);
     io.to(pin).emit('room:update', { players, state: room.state });
     socket.emit('room:joined', { roomId: room.id, pin });
+    console.log(`Player ${displayName} successfully joined room ${pin}`);
   });
 
   socket.on('room:host-join', (data) => {
     const { pin, userId, displayName } = data;
+    console.log(`Host ${displayName} (${userId}) trying to join room ${pin}`);
     const room = rooms.get(pin);
     
     if (!room) {
+      console.log(`Room ${pin} not found for host. Available rooms:`, Array.from(rooms.keys()));
       socket.emit('error', { message: 'Room not found' });
       return;
     }
+    
+    console.log(`Host joining room ${pin}. Current players:`, room.players.size);
     
     // Host doesn't join as a player - they just connect to manage the room
     userSockets.set(userId, socket.id);
@@ -333,6 +346,7 @@ io.on('connection', (socket) => {
     
     socket.emit('room:joined', { roomId: room.id, pin });
     socket.emit('room:update', { players, state: room.state });
+    console.log(`Host successfully joined room ${pin}`);
   });
 
   // Allow clients to re-identify after reconnect to refresh their socket mapping
