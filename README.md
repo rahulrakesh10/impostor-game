@@ -1,6 +1,6 @@
 # 🎭 Fake Out Game
 
-A real-time multiplayer party game where players try to identify the fake among them! Built with React, TypeScript, Node.js, and Socket.IO.
+A real-time multiplayer party game where players try to identify the impostor among them! Built with React 19, TypeScript, Node.js, and Socket.IO. Deployed on Fly.io with Docker containerization.
 
 ## 🎮 Game Overview
 
@@ -9,6 +9,7 @@ A real-time multiplayer party game where players try to identify the fake among 
 - Other players work together to identify the fake
 - Players vote on who they think is the fake
 - Points are awarded based on correct guesses
+- Multiple rounds with customizable settings and themes
 
 ## ✨ Features
 
@@ -41,15 +42,16 @@ A real-time multiplayer party game where players try to identify the fake among 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js (v16 or higher)
+- Node.js (v18 or higher) - required for backend
 - npm or yarn
+- Docker (optional, for containerized deployment)
 
 ### Installation
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/rahulrakesh10/fake-out-game.git
-   cd fake-out-game
+   git clone https://github.com/rahulrakesh10/impostor-game.git
+   cd impostor-game
    ```
 
 2. **Install backend dependencies**
@@ -84,6 +86,52 @@ A real-time multiplayer party game where players try to identify the fake among 
    - Go to `http://localhost:5173`
    - Choose "Host Game" for the game master
    - Choose "Join Game" for players
+
+## 🚀 Deployment
+
+### Docker Deployment
+
+The application is containerized using Docker with a multi-stage build:
+
+1. **Build the Docker image**
+   ```bash
+   docker build -t fake-out-game .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run -p 80:80 fake-out-game
+   ```
+
+3. **Access the application**
+   - Go to `http://localhost`
+   - The app will be served with nginx on port 80
+
+### Fly.io Deployment
+
+The application is deployed on Fly.io for production:
+
+1. **Install Fly CLI**
+   ```bash
+   curl -L https://fly.io/install.sh | sh
+   ```
+
+2. **Deploy to Fly.io**
+   ```bash
+   fly deploy
+   ```
+
+3. **Access the live application**
+   - Visit: `https://fakeout.fly.dev`
+   - The app runs on Fly.io's global network
+
+### Production Architecture
+
+- **Frontend**: Built with Vite and served by nginx
+- **Backend**: Node.js Express server with Socket.IO
+- **Container**: Alpine Linux with multi-stage Docker build
+- **Proxy**: nginx handles routing and WebSocket proxying
+- **Platform**: Fly.io with auto-scaling and HTTPS
 
 ## 🎮 How to Play
 
@@ -143,18 +191,22 @@ A real-time multiplayer party game where players try to identify the fake among 
 ## 🛠️ Technical Details
 
 ### Backend (Node.js + TypeScript)
-- **Express.js** server with Socket.IO
+- **Express.js** server with Socket.IO v4.7.5
 - **Real-time communication** between host and players
 - **Game state management** with room-based architecture
 - **Timer synchronization** across all clients
 - **Theme broadcasting** system
+- **CORS support** for cross-origin requests
+- **UUID generation** for unique room and player IDs
 
 ### Frontend (React + TypeScript)
-- **React 18** with TypeScript
-- **Vite** for fast development
-- **Socket.IO Client** for real-time updates
-- **Responsive CSS** with CSS variables
+- **React 19** with TypeScript
+- **Vite 7.1.6** for fast development and building
+- **Socket.IO Client v4.8.1** for real-time updates
+- **Responsive CSS** with CSS variables and themes
 - **Local storage** for user preferences
+- **ESLint** for code quality
+- **Modern React patterns** with hooks and functional components
 
 ### Key Components
 - `HostApp.tsx` - Host interface and game management
@@ -165,22 +217,30 @@ A real-time multiplayer party game where players try to identify the fake among 
 ## 📁 Project Structure
 
 ```
-fake-out-game/
+impostor-game/
 ├── backend/
 │   ├── src/
-│   │   └── server.ts          # Main server file
-│   ├── package.json
-│   └── tsconfig.json
+│   │   └── server.ts          # Main server file with game logic
+│   ├── dist/                  # Compiled JavaScript output
+│   ├── package.json           # Backend dependencies
+│   └── tsconfig.json          # TypeScript configuration
 ├── frontend/
 │   ├── src/
-│   │   ├── App.tsx            # Main app component
-│   │   ├── HostApp.tsx        # Host interface
-│   │   ├── PlayerApp.tsx      # Player interface
-│   │   ├── index.css          # Global styles and themes
-│   │   └── main.tsx           # App entry point
-│   ├── package.json
-│   └── vite.config.ts
-└── README.md
+│   │   ├── App.tsx            # Main app component with mode selection
+│   │   ├── HostApp.tsx        # Host interface and game management
+│   │   ├── PlayerApp.tsx      # Player interface and gameplay
+│   │   ├── index.css          # Global styles and theme variables
+│   │   └── main.tsx           # React app entry point
+│   ├── dist/                  # Built frontend assets
+│   ├── public/                # Static assets
+│   ├── package.json           # Frontend dependencies
+│   ├── vite.config.ts         # Vite build configuration
+│   └── eslint.config.js       # ESLint configuration
+├── Dockerfile                 # Multi-stage Docker build
+├── fly.toml                   # Fly.io deployment configuration
+├── nginx.conf                 # Nginx configuration for production
+├── start.sh                   # Production startup script
+└── README.md                  # Project documentation
 ```
 
 ## 🎨 Customization
@@ -218,6 +278,32 @@ cd ../frontend && rm -rf node_modules && npm install
 - Verify CORS settings in `server.ts`
 - Ensure firewall allows local connections
 
+**Docker build issues**
+```bash
+# Clean Docker cache and rebuild
+docker system prune -a
+docker build --no-cache -t fake-out-game .
+```
+
+**Fly.io deployment issues**
+```bash
+# Check app status
+fly status
+
+# View logs
+fly logs
+
+# SSH into the machine for debugging
+fly ssh console
+```
+
+### Development Tips
+
+- Use `npm run dev` in both frontend and backend for hot reloading
+- Check browser console for Socket.IO connection status
+- Use React DevTools for component debugging
+- Monitor network tab for WebSocket connections
+
 ## 🤝 Contributing
 
 1. Fork the repository
@@ -236,12 +322,27 @@ This project is open source and available under the [MIT License](LICENSE).
 - Inspired by social deduction games like Among Us
 - UI design inspired by modern party games like Kahoot
 
+## 🌐 Live Demo
+
+Try the game online at: **https://fakeout.fly.dev**
+
 ## 📞 Support
 
 If you encounter any issues or have questions:
 - Open an issue on GitHub
 - Check the troubleshooting section above
 - Review the game settings and configuration
+- Test with the live demo first
+
+## 🏗️ Development Status
+
+- ✅ Core gameplay mechanics
+- ✅ Real-time multiplayer
+- ✅ Multiple themes
+- ✅ Mobile responsive design
+- ✅ Docker containerization
+- ✅ Fly.io deployment
+- ✅ Production-ready architecture
 
 ---
 
