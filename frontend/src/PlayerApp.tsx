@@ -5,6 +5,7 @@ import io, { Socket } from 'socket.io-client';
 interface Player {
   id: string;
   displayName: string;
+  status: 'connected' | 'disconnected';
 }
 
 interface GameState {
@@ -49,7 +50,23 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
   const [answerSubmitted, setAnswerSubmitted] = useState<boolean>(false);
   const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false);
   const [currentTheme, setCurrentTheme] = useState<string>('default');
+  const [reconnectionAttempted, setReconnectionAttempted] = useState<boolean>(false);
   const joinContext = useRef<{ userId: string; displayName: string; pin: string } | null>(null);
+  
+  // Initialize joinContext from sessionStorage if available
+  useEffect(() => {
+    const savedUserId = sessionStorage.getItem('playerUserId');
+    const savedDisplayName = sessionStorage.getItem('playerDisplayName');
+    const savedPin = sessionStorage.getItem('playerPin');
+    
+    if (savedUserId && savedDisplayName && savedPin) {
+      joinContext.current = {
+        userId: savedUserId,
+        displayName: savedDisplayName,
+        pin: savedPin
+      };
+    }
+  }, []);
 
   // Remove local ticking; countdown is driven by server 'timer:update'
 
@@ -101,6 +118,21 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
       console.log('Socket reconnected');
       setSocketConnected(true);
       setError('');
+      
+      // Attempt to rejoin if we were previously in a room
+      if (joinContext.current && !reconnectionAttempted) {
+        console.log('Attempting to rejoin room after reconnection');
+        setReconnectionAttempted(true);
+        setTimeout(() => {
+          if (joinContext.current) {
+            newSocket.emit('room:rejoin', {
+              pin: joinContext.current.pin,
+              userId: joinContext.current.userId,
+              displayName: joinContext.current.displayName
+            });
+          }
+        }, 1000); // Small delay to ensure socket is fully ready
+      }
     });
 
     // Socket event listeners
@@ -217,8 +249,28 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
   }, []);
 
   const joinRoom = (pin: string, displayName: string, retryCount = 0) => {
-    const userId = Math.random().toString(36).substring(7);
+    // Always generate a completely unique userId for each join attempt
+    // Use sessionStorage instead of localStorage to avoid cross-tab conflicts
+    const existingUserId = joinContext.current?.userId;
+    const savedPin = sessionStorage.getItem('playerPin');
+    const savedDisplayName = sessionStorage.getItem('playerDisplayName');
+    
+    let userId;
+    if (existingUserId && savedPin === pin && savedDisplayName === displayName) {
+      // Only reuse userId for true reconnection (same room, same name)
+      userId = existingUserId;
+    } else {
+      // Generate new unique userId with timestamp and multiple random components
+      userId = `${Date.now()}-${Math.random().toString(36).substring(7)}-${Math.random().toString(36).substring(7)}-${Math.random().toString(36).substring(7)}`;
+    }
+    
+    // Store user info in sessionStorage for this tab only
+    sessionStorage.setItem('playerUserId', userId);
+    sessionStorage.setItem('playerDisplayName', displayName);
+    sessionStorage.setItem('playerPin', pin);
+    
     setError('');
+    setReconnectionAttempted(false);
     joinContext.current = { userId, displayName, pin };
     
     if (!socketConnected) {
@@ -231,7 +283,7 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
       return;
     }
     
-    console.log(`Joining room: ${pin} as: ${displayName} (attempt ${retryCount + 1})`);
+    console.log(`Joining room: ${pin} as: ${displayName} with userId: ${userId} (attempt ${retryCount + 1})`);
     socket.emit('room:join', { pin, userId, displayName });
     // In case of slow network/reconnects, proactively identify after connect
     socket.emit('user:identify', { userId, pin });
@@ -370,6 +422,18 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
 function PlayerLandingScreen({ onJoinRoom, error, socketConnected }: { onJoinRoom: (pin: string, name: string) => void; error?: string; socketConnected: boolean }) {
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
+  
+  // Pre-fill form with saved data if available
+  useEffect(() => {
+    const savedDisplayName = sessionStorage.getItem('playerDisplayName');
+    const savedPin = sessionStorage.getItem('playerPin');
+    
+    if (savedDisplayName) setDisplayName(savedDisplayName);
+    if (savedPin) setPin(savedPin);
+  }, []);
+  
+  // Check if error suggests reconnection is possible
+  const canRejoin = error && error.includes('disconnected player') && error.includes('rejoin');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -380,7 +444,7 @@ function PlayerLandingScreen({ onJoinRoom, error, socketConnected }: { onJoinRoo
   return (
     <div className="screen">
       <div className="container">
-        <h1 className="title">Fake Out</h1>
+        <h1 className="title">🎭 Fake Out</h1>
         
         <div className="player-badge">
           📱 Player Screen - Perfect for Phone
@@ -404,6 +468,15 @@ function PlayerLandingScreen({ onJoinRoom, error, socketConnected }: { onJoinRoo
         {error && (
           <div className="waiting-message" style={{ marginTop: '1rem' }}>
             <p style={{ color: '#b91c1c' }}>⚠️ {error}</p>
+            {canRejoin && (
+              <button 
+                onClick={() => onJoinRoom(pin, displayName)}
+                className="button secondary"
+                style={{ marginTop: '0.5rem' }}
+              >
+                🔄 Try to Rejoin
+              </button>
+            )}
           </div>
         )}
         

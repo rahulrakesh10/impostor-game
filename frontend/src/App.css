@@ -40,3 +40,87 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Disconnected player styles */
+.player-card.disconnected {
+  opacity: 0.6;
+  background-color: #fef3c7;
+  border: 2px solid #f59e0b;
+}
+
+.player-status.disconnected {
+  opacity: 0.6;
+  background-color: #fef3c7;
+}
+
+.player-status-indicator {
+  margin-right: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.connection-status {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.disconnected-label {
+  font-size: 0.7rem;
+  color: #92400e;
+  font-weight: 600;
+  margin-left: 0.5rem;
+}
+
+.player-name {
+  flex: 1;
+}
+
+/* Room PIN display styles */
+.room-pin-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.copy-pin-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.copy-pin-btn:hover {
+  background: #059669;
+}
+
+.copy-pin-btn:active {
+  transform: scale(0.95);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.room-pin-small {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.game-end-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 2rem;
+}

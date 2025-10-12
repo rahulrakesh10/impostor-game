@@ -10,6 +10,8 @@ interface User {
   id: string;
   displayName: string;
   socketId: string;
+  status: 'connected' | 'disconnected';
+  disconnectedAt?: Date;
 }
 
 interface Room {
@@ -38,7 +40,11 @@ interface Room {
   answerTimeout?: NodeJS.Timeout;
   voteTimeout?: NodeJS.Timeout;
   resultsTimeout?: NodeJS.Timeout;
+  disconnectTimeouts?: Map<string, NodeJS.Timeout>; // Track disconnect timeouts
 }
+
+// Configuration constants
+const DISCONNECT_GRACE_PERIOD = 60 * 1000; // 60 seconds in milliseconds
 
 interface Question {
   id: string;
@@ -235,7 +241,8 @@ app.post('/api/rooms', (req, res) => {
     },
     state: 'lobby',
     currentRound: 0,
-    scores: new Map()
+    scores: new Map(),
+    disconnectTimeouts: new Map()
   };
   
   rooms.set(pin, room);
@@ -283,9 +290,14 @@ io.on('connection', (socket) => {
     
     console.log(`Room ${pin} found. Current players:`, room.players.size);
     
+    // Allow rejoining during active games, but block new players
     if (room.state !== 'lobby') {
-      socket.emit('error', { message: 'Game already in progress' });
-      return;
+      // Check if this is a reconnection attempt (user was previously in the room)
+      const existingUser = room.players.get(userId);
+      if (!existingUser || existingUser.status === 'connected') {
+        socket.emit('error', { message: 'Game already in progress' });
+        return;
+      }
     }
 
     // Enforce unique player names (case-insensitive, trimmed)
@@ -294,17 +306,58 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Display name is required' });
       return;
     }
+    
+    // Check for name conflicts - only block if there's a connected player with the same name
     const nameTaken = Array.from(room.players.values()).some(
-      (p) => p.displayName.trim().toLowerCase() === normalizedName.toLowerCase()
+      (p) => p.displayName.trim().toLowerCase() === normalizedName.toLowerCase() && p.status === 'connected'
     );
     if (nameTaken) {
       socket.emit('error', { message: 'That player name is already in use. Pick another name.' });
       return;
     }
     
-    const user: User = { id: userId, displayName: normalizedName, socketId: socket.id };
-    room.players.set(userId, user);
-    room.scores.set(userId, 0);
+    // Check if this is a reconnection attempt
+    const existingUser = room.players.get(userId);
+    if (existingUser && existingUser.status === 'disconnected') {
+      // This is a reconnection - restore the user
+      existingUser.socketId = socket.id;
+      existingUser.status = 'connected';
+      existingUser.disconnectedAt = undefined;
+      
+      // Clear any pending disconnect timeout
+      if (room.disconnectTimeouts?.has(userId)) {
+        clearTimeout(room.disconnectTimeouts.get(userId)!);
+        room.disconnectTimeouts.delete(userId);
+      }
+      
+      console.log(`Player ${displayName} reconnected to room ${pin}`);
+    } else {
+      // This is a new player joining
+      // Check if there's a disconnected player with the same name
+      const disconnectedPlayer = Array.from(room.players.values()).find(
+        (p) => p.displayName.trim().toLowerCase() === normalizedName.toLowerCase() && p.status === 'disconnected'
+      );
+      
+      if (disconnectedPlayer) {
+        socket.emit('error', { 
+          message: 'A disconnected player with that name exists. Please wait for them to reconnect or use a different name.',
+          rejoinAvailable: true 
+        });
+        return;
+      }
+      
+      // Create new user
+      const user: User = { 
+        id: userId, 
+        displayName: normalizedName, 
+        socketId: socket.id, 
+        status: 'connected' 
+      };
+      room.players.set(userId, user);
+      room.scores.set(userId, 0);
+      console.log(`Added new player: ${normalizedName} (${userId}) to room ${pin}. Total players now: ${room.players.size}`);
+    }
+    
     userSockets.set(userId, socket.id);
     
     socket.join(pin);
@@ -312,12 +365,41 @@ io.on('connection', (socket) => {
     // Broadcast updated player list
     const players = Array.from(room.players.values()).map(p => ({
       id: p.id,
-      displayName: p.displayName
+      displayName: p.displayName,
+      status: p.status
     }));
     
     console.log(`Broadcasting room update to ${pin}. Players:`, players.length);
     io.to(pin).emit('room:update', { players, state: room.state });
     socket.emit('room:joined', { roomId: room.id, pin });
+    
+    // If this was a reconnection during an active game, send the current game state
+    const reconnectedUser = room.players.get(userId);
+    if (reconnectedUser && room.state !== 'lobby' && room.currentRoundData) {
+      if (room.state === 'answering') {
+        const isFake = userId === room.currentRoundData.fakeId;
+        const question = isFake ? room.currentRoundData.fakeQuestion : room.currentRoundData.groupQuestion;
+        socket.emit('round:start', {
+          roundNumber: room.currentRound,
+          timer: room.settings.answerTimer
+        });
+        socket.emit(isFake ? 'prompt:fake' : 'prompt:group', {
+          text: question,
+          players
+        });
+      } else if (room.state === 'discussing') {
+        socket.emit('discussion:start', {
+          timer: room.settings.discussionTimer,
+          question: room.currentRoundData.groupQuestion
+        });
+      } else if (room.state === 'voting') {
+        socket.emit('voting:start', {
+          timer: room.settings.voteTimer,
+          players
+        });
+      }
+    }
+    
     console.log(`Player ${displayName} successfully joined room ${pin}`);
   });
 
@@ -341,7 +423,8 @@ io.on('connection', (socket) => {
     // Send current room state to host
     const players = Array.from(room.players.values()).map(p => ({
       id: p.id,
-      displayName: p.displayName
+      displayName: p.displayName,
+      status: p.status
     }));
     
     socket.emit('room:joined', { roomId: room.id, pin });
@@ -362,7 +445,11 @@ io.on('connection', (socket) => {
         if (pin && pin === room.pin) {
           socket.join(room.pin);
           // Send a lightweight state ping so client can refresh if needed
-          const players = Array.from(room.players.values()).map(p => ({ id: p.id, displayName: p.displayName }));
+          const players = Array.from(room.players.values()).map(p => ({ 
+            id: p.id, 
+            displayName: p.displayName, 
+            status: p.status 
+          }));
           socket.emit('room:update', { players, state: room.state });
           // If a round is active, resend their current prompt
           if (room.state === 'answering' && room.currentRoundData) {
@@ -378,6 +465,90 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle player reconnection with same name
+  socket.on('room:rejoin', (data) => {
+    const { pin, userId, displayName } = data;
+    console.log(`Player ${displayName} (${userId}) trying to rejoin room ${pin}`);
+    const room = rooms.get(pin);
+    
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    // Check if user was previously in this room and is within grace period
+    const existingUser = room.players.get(userId);
+    if (!existingUser) {
+      socket.emit('error', { message: 'User not found in this room' });
+      return;
+    }
+    
+    if (existingUser.status === 'connected') {
+      socket.emit('error', { message: 'You are already connected' });
+      return;
+    }
+    
+    // Check if still within grace period
+    if (existingUser.disconnectedAt) {
+      const timeSinceDisconnect = Date.now() - existingUser.disconnectedAt.getTime();
+      if (timeSinceDisconnect > DISCONNECT_GRACE_PERIOD) {
+        socket.emit('error', { message: 'Reconnection grace period expired' });
+        return;
+      }
+    }
+    
+    // Restore user connection
+    existingUser.socketId = socket.id;
+    existingUser.status = 'connected';
+    existingUser.disconnectedAt = undefined;
+    
+    // Clear any pending disconnect timeout
+    if (room.disconnectTimeouts?.has(userId)) {
+      clearTimeout(room.disconnectTimeouts.get(userId)!);
+      room.disconnectTimeouts.delete(userId);
+    }
+    
+    userSockets.set(userId, socket.id);
+    socket.join(pin);
+    
+    // Broadcast updated player list
+    const players = Array.from(room.players.values()).map(p => ({
+      id: p.id,
+      displayName: p.displayName,
+      status: p.status
+    }));
+    
+    console.log(`Player ${displayName} successfully rejoined room ${pin}`);
+    io.to(pin).emit('room:update', { players, state: room.state });
+    socket.emit('room:joined', { roomId: room.id, pin });
+    
+    // If a round is active, resend their current prompt and state
+    if (room.currentRoundData) {
+      if (room.state === 'answering') {
+        const isFake = userId === room.currentRoundData.fakeId;
+        const question = isFake ? room.currentRoundData.fakeQuestion : room.currentRoundData.groupQuestion;
+        socket.emit(isFake ? 'prompt:fake' : 'prompt:group', {
+          text: question,
+          players
+        });
+        socket.emit('round:start', {
+          roundNumber: room.currentRound,
+          timer: room.settings.answerTimer
+        });
+      } else if (room.state === 'discussing') {
+        socket.emit('discussion:start', {
+          timer: room.settings.discussionTimer,
+          question: room.currentRoundData.groupQuestion
+        });
+      } else if (room.state === 'voting') {
+        socket.emit('voting:start', {
+          timer: room.settings.voteTimer,
+          players
+        });
+      }
+    }
+  });
+
   socket.on('game:start', (data) => {
     const { pin, settings } = data;
     const room = rooms.get(pin);
@@ -388,8 +559,15 @@ io.on('connection', (socket) => {
     }
     
     const players = Array.from(room.players.keys());
+    const connectedPlayers = Array.from(room.players.values()).filter(p => p.status === 'connected');
+    
     if (players.length < 3) {
       socket.emit('error', { message: 'Need at least 3 players to start' });
+      return;
+    }
+    
+    if (connectedPlayers.length < 3) {
+      socket.emit('error', { message: 'Need at least 3 connected players to start the game' });
       return;
     }
     
@@ -532,21 +710,48 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    // Handle player disconnect - remove from rooms
+    // Handle player disconnect with grace period
     for (const [userId, socketId] of userSockets.entries()) {
       if (socketId === socket.id) {
         userSockets.delete(userId);
-        // Remove from all rooms
+        // Mark as disconnected in all rooms instead of removing immediately
         for (const room of rooms.values()) {
           if (room.players.has(userId)) {
-            room.players.delete(userId);
-            room.scores.delete(userId);
-            // Broadcast updated player list
+            const user = room.players.get(userId)!;
+            user.status = 'disconnected';
+            user.disconnectedAt = new Date();
+            
+            // Set timeout to actually remove player after grace period
+            const disconnectTimeout = setTimeout(() => {
+              console.log(`Removing player ${userId} from room ${room.pin} after grace period`);
+              room.players.delete(userId);
+              room.scores.delete(userId);
+              room.disconnectTimeouts?.delete(userId);
+              
+              // Broadcast updated player list
+              const players = Array.from(room.players.values()).map(p => ({
+                id: p.id,
+                displayName: p.displayName,
+                status: p.status
+              }));
+              io.to(room.pin).emit('room:update', { players, state: room.state });
+            }, DISCONNECT_GRACE_PERIOD);
+            
+            // Store timeout for potential cancellation if player reconnects
+            if (!room.disconnectTimeouts) {
+              room.disconnectTimeouts = new Map();
+            }
+            room.disconnectTimeouts.set(userId, disconnectTimeout);
+            
+            // Broadcast updated player list with disconnected status
             const players = Array.from(room.players.values()).map(p => ({
               id: p.id,
-              displayName: p.displayName
+              displayName: p.displayName,
+              status: p.status
             }));
             io.to(room.pin).emit('room:update', { players, state: room.state });
+            
+            console.log(`Player ${user.displayName} marked as disconnected in room ${room.pin}`);
           }
         }
         break;

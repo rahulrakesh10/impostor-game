@@ -5,6 +5,7 @@ import io, { Socket } from 'socket.io-client';
 interface Player {
   id: string;
   displayName: string;
+  status: 'connected' | 'disconnected';
 }
 
 interface GameState {
@@ -328,6 +329,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         timer={countdown}
         isFake={gameState.isFake!}
         playerAnswers={playerAnswers}
+        room={gameState.room!}
       />
     );
   }
@@ -339,6 +341,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         timer={countdown}
         playerAnswers={playerAnswers}
         question={gameState.currentQuestion!}
+        room={gameState.room!}
         onSkipToVoting={() => {
           if (socket && gameState.room?.pin && gameState.user?.id) {
             socket.emit('discussion:skip-to-voting', { 
@@ -356,6 +359,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
       <HostVotingScreen
         players={gameState.room!.players}
         timer={countdown}
+        room={gameState.room!}
       />
     );
   }
@@ -367,6 +371,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         lastResult={gameState.lastResult!}
         players={gameState.room!.players}
         timer={countdown}
+        room={gameState.room!}
       />
     );
   }
@@ -375,6 +380,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
     return (
       <HostGameEndScreen
         finalScores={gameState.scores!}
+        room={gameState.room!}
       />
     );
   }
@@ -387,7 +393,7 @@ function HostLandingScreen({ onCreateRoom, socketConnected, error }: { onCreateR
   return (
     <div className="screen">
       <div className="container">
-        <h1 className="title">Fake Out</h1>
+        <h1 className="title">🎭 Fake Out</h1>
         
         <div className="host-badge">
           🖥️ Host Screen - Perfect for iPad/Laptop
@@ -451,7 +457,24 @@ function HostLobbyScreen({
     <div className="screen">
       <div className="container">
         <div className="lobby-header">
-          <h2>Room PIN: {room.pin}</h2>
+          <div className="room-pin-display">
+            <h2>Room PIN: {room.pin}</h2>
+            <button 
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(room.pin);
+                  // You could add a toast notification here if you have one
+                  console.log('PIN copied to clipboard');
+                } catch (err) {
+                  console.error('Failed to copy PIN:', err);
+                }
+              }}
+              className="copy-pin-btn"
+              title="Copy PIN to clipboard"
+            >
+              📋 Copy
+            </button>
+          </div>
           <button 
             onClick={onToggleSettings}
             className="button secondary settings-btn"
@@ -474,8 +497,14 @@ function HostLobbyScreen({
         <div className="players-list">
           <h3>Players ({room.players.length})</h3>
           {room.players.map(player => (
-            <div key={player.id} className="player-card">
-              {player.displayName}
+            <div key={player.id} className={`player-card ${player.status === 'disconnected' ? 'disconnected' : ''}`}>
+              <div className="player-status-indicator">
+                {player.status === 'connected' ? '🟢' : '🟡'}
+              </div>
+              <span className="player-name">{player.displayName}</span>
+              {player.status === 'disconnected' && (
+                <span className="disconnected-label">Disconnected</span>
+              )}
             </div>
           ))}
         </div>
@@ -497,7 +526,8 @@ function HostAnswerScreen({
   players,
   timer,
   isFake,
-  playerAnswers
+  playerAnswers,
+  room
 }: {
   question: string;
   players: Player[];
@@ -509,6 +539,7 @@ function HostAnswerScreen({
     answerId: string;
     answerName: string;
   }>;
+  room?: { pin: string; players: Player[] };
 }) {
   return (
     <div className="screen">
@@ -519,7 +550,10 @@ function HostAnswerScreen({
         </div>
         
         <div className="host-header">
-          <h2>🎮 Host View - Answering Phase</h2>
+          <div className="header-top">
+            <h2>🎮 Host View - Answering Phase</h2>
+            <div className="room-pin-small">PIN: {room?.pin}</div>
+          </div>
           <div className="phase-info">
             <span className="phase-badge">Players are answering...</span>
           </div>
@@ -537,9 +571,12 @@ function HostAnswerScreen({
             {players.map(player => {
               const answer = playerAnswers.find(a => a.playerId === player.id);
               return (
-                <div key={player.id} className="player-status">
+                <div key={player.id} className={`player-status ${player.status === 'disconnected' ? 'disconnected' : ''}`}>
                   <div className="player-avatar">👤</div>
                   <span>{player.displayName}</span>
+                  <div className="connection-status">
+                    {player.status === 'connected' ? '🟢' : '🟡'}
+                  </div>
                   <div className="status-indicator">
                     {answer ? (
                       <span className="answer-status">✅ {answer.answerName}</span>
@@ -562,7 +599,8 @@ function HostDiscussionScreen({
   timer,
   playerAnswers,
   question,
-  onSkipToVoting
+  onSkipToVoting,
+  room
 }: {
   players: Player[];
   timer: number;
@@ -574,6 +612,7 @@ function HostDiscussionScreen({
   }>;
   question: string;
   onSkipToVoting?: () => void;
+  room?: { pin: string; players: Player[] };
 }) {
   return (
     <div className="screen">
@@ -584,7 +623,10 @@ function HostDiscussionScreen({
         </div>
         
         <div className="host-header">
-          <h2>🎮 Host View - Discussion Phase</h2>
+          <div className="header-top">
+            <h2>🎮 Host View - Discussion Phase</h2>
+            <div className="room-pin-small">PIN: {room?.pin}</div>
+          </div>
           <div className="phase-info">
             <span className="phase-badge">Players are discussing...</span>
           </div>
@@ -641,10 +683,12 @@ function HostDiscussionScreen({
 
 function HostVotingScreen({
   players,
-  timer
+  timer,
+  room
 }: {
   players: Player[];
   timer: number;
+  room?: { pin: string; players: Player[] };
 }) {
   return (
     <div className="screen">
@@ -655,7 +699,10 @@ function HostVotingScreen({
         </div>
         
         <div className="host-header">
-          <h2>🎮 Host View - Voting Phase</h2>
+          <div className="header-top">
+            <h2>🎮 Host View - Voting Phase</h2>
+            <div className="room-pin-small">PIN: {room?.pin}</div>
+          </div>
           <div className="phase-info">
             <span className="phase-badge">Players are voting...</span>
           </div>
@@ -687,12 +734,14 @@ function HostResultsScreen({
   scores,
   lastResult,
   players,
-  timer
+  timer,
+  room
 }: {
   scores: Array<{ userId: string; displayName: string; score: number }>;
   lastResult: { fakeId: string; fakeCaught: boolean };
   players: Player[];
   timer?: number;
+  room?: { pin: string; players: Player[] };
 }) {
   const fake = players.find(p => p.id === lastResult.fakeId);
   
@@ -702,14 +751,17 @@ function HostResultsScreen({
         {timer && <div className="timer">Next Round: {timer}s</div>}
         
         <div className="host-header">
-          <h2>🎮 Host View - Round Results</h2>
+          <div className="header-top">
+            <h2>🎮 Host View - Round Results</h2>
+            <div className="room-pin-small">PIN: {room?.pin}</div>
+          </div>
           <div className="phase-info">
             <span className="phase-badge">Round Complete!</span>
           </div>
         </div>
         
         <div className="result-reveal">
-          <h3>🎭 The Fake Was:</h3>
+          <h3>The Fake Was:</h3>
           <div className="fake-reveal">
             <div className="fake-avatar">🎭</div>
             <span className="fake-name">{fake?.displayName}</span>
@@ -735,14 +787,21 @@ function HostResultsScreen({
 }
 
 function HostGameEndScreen({
-  finalScores
+  finalScores,
+  room
 }: {
   finalScores: Array<{ userId: string; displayName: string; score: number }>;
+  room?: { pin: string; players: Player[] };
 }) {
   return (
     <div className="screen">
       <div className="container">
-        <h2>Game Over!</h2>
+        <div className="game-end-header">
+          <h2>Game Over!</h2>
+          {room && (
+            <div className="room-pin-small">PIN: {room.pin}</div>
+          )}
+        </div>
         
         <div className="final-scores">
           {finalScores.map((player, index) => (
