@@ -124,3 +124,83 @@
   width: 100%;
   margin-bottom: 2rem;
 }
+
+/* QR Code Styles */
+.qr-code-section {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.qr-code-section h3 {
+  margin: 0 0 1rem 0;
+  color: #10b981;
+  font-size: 1.1rem;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.qr-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(16, 185, 129, 0.3);
+  border-top: 4px solid #10b981;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.qr-code-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.qr-code-image {
+  width: 200px;
+  height: 200px;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 2px solid rgba(16, 185, 129, 0.3);
+}
+
+.qr-instructions {
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+  text-align: center;
+  max-width: 250px;
+}
+
+/* Dark theme adjustments for QR code */
+[data-theme="dark"] .qr-code-section {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .qr-code-image {
+  border: 2px solid rgba(16, 185, 129, 0.5);
+}
+
+[data-theme="dark"] .qr-instructions {
+  color: #9ca3af;
+}

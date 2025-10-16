@@ -423,13 +423,22 @@ function PlayerLandingScreen({ onJoinRoom, error, socketConnected }: { onJoinRoo
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
   
-  // Pre-fill form with saved data if available
+  // Pre-fill form with saved data if available, and check URL parameters
   useEffect(() => {
     const savedDisplayName = sessionStorage.getItem('playerDisplayName');
     const savedPin = sessionStorage.getItem('playerPin');
     
+    // Check URL parameters for PIN (from QR code)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPin = urlParams.get('pin');
+    
     if (savedDisplayName) setDisplayName(savedDisplayName);
     if (savedPin) setPin(savedPin);
+    
+    // If URL has a PIN parameter, use it (overrides saved PIN)
+    if (urlPin) {
+      setPin(urlPin);
+    }
   }, []);
   
   // Check if error suggests reconnection is possible

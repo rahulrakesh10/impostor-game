@@ -1,6 +1,7 @@
 // frontend/src/HostApp.tsx - Host-specific interface
 import React, { useState, useEffect } from 'react';
 import io, { Socket } from 'socket.io-client';
+import QRCode from 'qrcode';
 
 interface Player {
   id: string;
@@ -482,6 +483,8 @@ function HostLobbyScreen({
             ⚙️ Game Settings
           </button>
         </div>
+        
+        <QRCodeDisplay roomPin={room.pin} />
         
         <div className="host-info">
           <h3>🎮 Host: {gameState.user?.displayName}</h3>
@@ -1026,6 +1029,66 @@ function GameSettingsPanel({
             🏆 Tournament
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// QR Code Component
+function QRCodeDisplay({ roomPin }: { roomPin: string }) {
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const generateQRCode = async () => {
+      try {
+        setIsLoading(true);
+        // Generate the game URL with the room PIN - use production URL
+        const gameUrl = `https://fakeout.fly.dev/?pin=${roomPin}`;
+        
+        // Generate QR code with high quality settings
+        const qrCodeUrl = await QRCode.toDataURL(gameUrl, {
+          width: 200,
+          margin: 2,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          },
+          errorCorrectionLevel: 'M'
+        });
+        
+        setQrCodeDataUrl(qrCodeUrl);
+      } catch (error) {
+        console.error('Failed to generate QR code:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    generateQRCode();
+  }, [roomPin]);
+
+  return (
+    <div className="qr-code-section">
+      <h3>📱 Players can scan to join:</h3>
+      <div className="qr-code-container">
+        {isLoading ? (
+          <div className="qr-loading">
+            <div className="loading-spinner"></div>
+            <p>Generating QR code...</p>
+          </div>
+        ) : (
+          <div className="qr-code-wrapper">
+            <img 
+              src={qrCodeDataUrl} 
+              alt="QR Code to join game" 
+              className="qr-code-image"
+            />
+            <p className="qr-instructions">
+              Scan with your phone camera to join the game
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
