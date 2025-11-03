@@ -589,7 +589,7 @@ function PlayerAnswerScreen({
         
         {timer && <div className="timer">Time: {timer}s</div>}
         
-        <div className={`question-container ${isFake ? 'fake' : 'group'}`}>
+        <div className={`question-container`}>
           <h2>{question}</h2>
           {/* Hide fake badge during answering so fake doesn't know they have different question */}
         </div>

@@ -47,6 +47,7 @@ interface Room {
 
 // Configuration constants
 const DISCONNECT_GRACE_PERIOD = 60 * 1000; // 60 seconds in milliseconds
+const MAX_PLAYERS = 10; // Hard cap on concurrent connected players per room
 
 interface Question {
   id: string;
@@ -517,6 +518,13 @@ io.on('connection', (socket) => {
     }
     
     console.log(`Room ${pin} found. Current players:`, room.players.size);
+
+    // Enforce max connected players in lobby (reconnections still allowed)
+    const connectedCount = Array.from(room.players.values()).filter(p => p.status === 'connected').length;
+    if (room.state === 'lobby' && connectedCount >= MAX_PLAYERS) {
+      socket.emit('error', { message: `Room is full (max ${MAX_PLAYERS} players)` });
+      return;
+    }
     
     // Allow rejoining during active games, but block new players
     if (room.state !== 'lobby') {

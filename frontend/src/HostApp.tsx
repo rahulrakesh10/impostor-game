@@ -78,6 +78,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
     fakePoints: 3,
     groupPoints: 1
   });
+  const [showTutorial, setShowTutorial] = useState<boolean>(false);
 
   // Countdown timer effect - sync with server
   useEffect(() => {
@@ -96,6 +97,8 @@ function HostApp({ onGameStateChange }: HostAppProps) {
       onGameStateChange(gameInProgress);
     }
   }, [gameState.state, onGameStateChange]);
+
+  // Tutorial opens only via explicit user action (How to Play button)
 
   useEffect(() => {
     console.log('Connecting to socket at:', SOCKET_URL);
@@ -306,21 +309,45 @@ function HostApp({ onGameStateChange }: HostAppProps) {
   }, [gameSettings.theme, socket, gameState.room]);
 
   if (gameState.state === 'landing') {
-    return <HostLandingScreen onCreateRoom={createRoom} socketConnected={socketConnected} error={error} />;
+    return (
+      <>
+        <HostLandingScreen 
+          onCreateRoom={createRoom} 
+          socketConnected={socketConnected} 
+          error={error} 
+          onShowTutorial={() => setShowTutorial(true)}
+          showTutorial={showTutorial}
+          onCloseTutorial={(dontShowAgain?: boolean) => {
+            if (dontShowAgain) localStorage.setItem('hostTutorialSeen', 'true');
+            setShowTutorial(false);
+          }}
+          tutorialPoints={{ fakePoints: gameSettings.fakePoints, groupPoints: gameSettings.groupPoints }}
+        />
+      </>
+    );
   }
 
   if (gameState.state === 'lobby') {
     return (
-      <HostLobbyScreen
-        room={gameState.room!}
-        user={gameState.user!}
-        onStartGame={startGame}
-        gameState={gameState}
-        showSettings={showSettings}
-        onToggleSettings={() => setShowSettings(!showSettings)}
-        gameSettings={gameSettings}
-        onUpdateSettings={updateSettings}
-      />
+      <>
+        <HostLobbyScreen
+          room={gameState.room!}
+          user={gameState.user!}
+          onStartGame={startGame}
+          gameState={gameState}
+          showSettings={showSettings}
+          onToggleSettings={() => setShowSettings(!showSettings)}
+          gameSettings={gameSettings}
+          onUpdateSettings={updateSettings}
+          onShowTutorial={() => setShowTutorial(true)}
+          showTutorial={showTutorial}
+          onCloseTutorial={(dontShowAgain?: boolean) => {
+            if (dontShowAgain) localStorage.setItem('hostTutorialSeen', 'true');
+            setShowTutorial(false);
+          }}
+          tutorialPoints={{ fakePoints: gameSettings.fakePoints, groupPoints: gameSettings.groupPoints }}
+        />
+      </>
     );
   }
 
@@ -392,7 +419,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
 }
 
 // Host-specific components
-function HostLandingScreen({ onCreateRoom, socketConnected, error }: { onCreateRoom: () => void; socketConnected: boolean; error?: string }) {
+function HostLandingScreen({ onCreateRoom, socketConnected, error, onShowTutorial, showTutorial, onCloseTutorial, tutorialPoints }: { onCreateRoom: () => void; socketConnected: boolean; error?: string; onShowTutorial: () => void; showTutorial?: boolean; onCloseTutorial?: (dontShowAgain?: boolean) => void; tutorialPoints?: { fakePoints: number; groupPoints: number } }) {
   return (
     <div className="screen">
       <div className="container">
@@ -445,7 +472,11 @@ function HostLobbyScreen({
   showSettings,
   onToggleSettings,
   gameSettings,
-  onUpdateSettings
+  onUpdateSettings,
+  onShowTutorial,
+  showTutorial,
+  onCloseTutorial,
+  tutorialPoints
 }: { 
   room: { pin: string; players: Player[] };
   user: { isHost: boolean };
@@ -455,6 +486,10 @@ function HostLobbyScreen({
   onToggleSettings: () => void;
   gameSettings: GameSettings;
   onUpdateSettings: (settings: Partial<GameSettings>) => void;
+  onShowTutorial: () => void;
+  showTutorial?: boolean;
+  onCloseTutorial?: (dontShowAgain?: boolean) => void;
+  tutorialPoints?: { fakePoints: number; groupPoints: number };
 }) {
   return (
     <div className="screen">
@@ -483,6 +518,13 @@ function HostLobbyScreen({
             className="button secondary settings-btn"
           >
             ⚙️ Game Settings
+          </button>
+          <button 
+            onClick={onShowTutorial}
+            className="button secondary"
+            style={{ marginLeft: '0.5rem' }}
+          >
+            ❓ How to Play
           </button>
         </div>
         
@@ -523,6 +565,9 @@ function HostLobbyScreen({
         >
           Start Game {room.players.length < 3 && '(Need 3+ players)'}
         </button>
+        {showTutorial && onCloseTutorial && (
+          <TutorialCarouselModal onClose={onCloseTutorial} fakePoints={tutorialPoints?.fakePoints} groupPoints={tutorialPoints?.groupPoints} />
+        )}
       </div>
     </div>
   );
@@ -967,19 +1012,6 @@ function GameSettingsPanel({
             className="button secondary preset-btn"
             onClick={(e) => {
               e.preventDefault();
-              console.log('Current settings:', settings);
-              alert(`Current theme: ${settings.theme}\nAnswer timer: ${settings.answerTimer}s\nRounds: ${settings.rounds}`);
-            }}
-            onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.95)'}
-            onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
-            onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-          >
-            🔍 Test Settings
-          </button>
-          <button 
-            className="button secondary preset-btn"
-            onClick={(e) => {
-              e.preventDefault();
               onUpdateSettings({
                 answerTimer: 15,
                 discussionTimer: 60,
@@ -1094,3 +1126,128 @@ function QRCodeDisplay({ roomPin }: { roomPin: string }) {
 }
 
 export default HostApp;
+
+// Visual slideshow tutorial component (mini presentation)
+function TutorialCarouselModal({ onClose, fakePoints, groupPoints }: { onClose: (dontShowAgain?: boolean) => void; fakePoints?: number; groupPoints?: number }) {
+  const [index, setIndex] = React.useState(0);
+  const fp = typeof fakePoints === 'number' ? fakePoints : 3;
+  const gp = typeof groupPoints === 'number' ? groupPoints : 1;
+
+  const slides: Array<React.ReactNode> = [
+    (
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 56, marginBottom: 12 }}>🎭 Fake Out</div>
+        <div style={{ fontSize: 18, opacity: 0.8 }}>Spot the impostor. Don’t get fooled.</div>
+        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center', gap: 16 }}>
+          <div style={{ padding: 12, borderRadius: 12, background: 'var(--color-muted, #eef2ff)', minWidth: 180 }}>
+            <div style={{ fontSize: 36 }}>🖥️</div>
+            <div>Host runs the game</div>
+          </div>
+          <div style={{ padding: 12, borderRadius: 12, background: 'var(--color-muted, #eef2ff)', minWidth: 180 }}>
+            <div style={{ fontSize: 36 }}>📱</div>
+            <div>Players join on phones</div>
+          </div>
+        </div>
+      </div>
+    ),
+    (
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>Create a Room & Share</div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, alignItems: 'center' }}>
+          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>Room PIN</div>
+            <div style={{ fontSize: 36, letterSpacing: 4 }}>1 2 3 4 5 6</div>
+          </div>
+          <div style={{ fontSize: 80 }}>🔗</div>
+          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>QR Code</div>
+            <div style={{ width: 120, height: 120, background: 'linear-gradient(135deg, #e5e7eb, #cbd5e1)', borderRadius: 8 }} />
+          </div>
+        </div>
+        <div style={{ marginTop: 12, opacity: 0.8 }}>Players scan or enter the PIN to join.</div>
+      </div>
+    ),
+    (
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>Answer Phase</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
+          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 16, opacity: 0.7, marginBottom: 8 }}>Group Question</div>
+            <div style={{ fontSize: 18 }}>What’s the best movie snack?</div>
+          </div>
+          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 16, opacity: 0.7, marginBottom: 8 }}>Impostor Question</div>
+            <div style={{ fontSize: 18 }}>What’s your favorite pizza topping?</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, opacity: 0.8 }}>One player secretly gets a different question.</div>
+      </div>
+    ),
+    (
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>Discuss</div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+          <div style={{ fontSize: 36 }}>💬</div>
+          <div style={{ fontSize: 36 }}>🕵️</div>
+          <div style={{ fontSize: 36 }}>🤔</div>
+        </div>
+        <div style={{ marginTop: 12, opacity: 0.8 }}>Share reasoning and look for inconsistencies. Host can skip to voting.</div>
+      </div>
+    ),
+    (
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 8 }}>Vote & Score</div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
+          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>Vote for the impostor</div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb' }} />
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb' }} />
+              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb' }} />
+            </div>
+          </div>
+          <div style={{ fontSize: 64 }}>➡️</div>
+          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
+            <div style={{ fontSize: 18, marginBottom: 6 }}>Scoring</div>
+            <div>Impostor +{fp} if not caught</div>
+            <div>Group +{gp} if caught</div>
+          </div>
+        </div>
+        <div style={{ marginTop: 12, opacity: 0.8 }}>Leaderboards update every round.</div>
+      </div>
+    )
+  ];
+
+  const isLast = index === slides.length - 1;
+
+  return (
+    <div className="modal-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '1rem' }}>
+      <div className="modal" style={{ background: 'var(--color-surface, #fff)', color: 'var(--color-text, #111)', borderRadius: 20, maxWidth: 920, width: '100%', padding: '1rem 1rem 0.75rem', boxShadow: '0 10px 30px rgba(0,0,0,0.2)' }}>
+        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+          <h3 style={{ margin: 0 }}>How to Play</h3>
+          <button className="button secondary" onClick={() => onClose()} title="Close">✖️</button>
+        </div>
+        <div className="modal-body" style={{ maxHeight: '70vh', overflow: 'auto', padding: '0.5rem 0.25rem' }}>
+          {slides[index]}
+        </div>
+        <div className="modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginTop: '0.75rem', paddingTop: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {slides.map((_, i) => (
+              <div key={i} style={{ width: 10, height: 10, borderRadius: 6, background: i === index ? 'var(--color-primary, #3b82f6)' : '#d1d5db' }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="button secondary" onClick={() => onClose(true)}>Don't show again</button>
+            <button className="button secondary" onClick={() => setIndex(Math.max(0, index - 1))} disabled={index === 0}>Back</button>
+            {!isLast && (
+              <button className="button primary" onClick={() => setIndex(Math.min(slides.length - 1, index + 1))}>Next</button>
+            )}
+            {isLast && (
+              <button className="button primary" onClick={() => onClose()}>Got it</button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
