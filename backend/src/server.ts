@@ -4,6 +4,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt } from 'crypto';
 
 // Types
 interface User {
@@ -35,6 +36,7 @@ interface Room {
     votes: Map<string, string>;
   };
   scores: Map<string, number>;
+  usedQuestionIds: Set<string>; // Track which question IDs have been used
   timerInterval?: NodeJS.Timeout;
   discussionTimeout?: NodeJS.Timeout;
   answerTimeout?: NodeJS.Timeout;
@@ -166,6 +168,136 @@ const SAMPLE_QUESTIONS: Question[] = [
   { id: '92', text: 'Who can\'t keep a secret to save their life?', type: 'fake', tags: ['random'] },
   { id: '93', text: 'Who would survive without the internet the longest?', type: 'group', tags: ['random'] },
   { id: '94', text: 'Who would die without WiFi?', type: 'fake', tags: ['random'] },
+
+  // 🧠 Personality & Humor
+  { id: '95', text: 'Who can make anyone laugh in under 10 seconds?', type: 'group', tags: ['personality', 'humor'] },
+  { id: '96', text: 'Who laughs at the wrong moments?', type: 'fake', tags: ['personality', 'humor'] },
+  { id: '97', text: 'Who has the most contagious energy?', type: 'group', tags: ['personality', 'humor'] },
+  { id: '98', text: 'Who drains everyone\'s energy first?', type: 'fake', tags: ['personality', 'humor'] },
+  { id: '99', text: 'Who could star in a comedy show?', type: 'group', tags: ['personality', 'humor'] },
+  { id: '100', text: 'Who would get booed off stage?', type: 'fake', tags: ['personality', 'humor'] },
+  { id: '101', text: 'Who takes jokes too seriously?', type: 'fake', tags: ['personality', 'humor'] },
+  { id: '102', text: 'Who tells dad jokes unironically?', type: 'group', tags: ['personality', 'humor'] },
+  { id: '103', text: 'Who cracks up before finishing their story?', type: 'group', tags: ['personality', 'humor'] },
+  { id: '104', text: 'Who has the most monotone delivery?', type: 'fake', tags: ['personality', 'humor'] },
+
+  // 📚 School & Work
+  { id: '105', text: 'Who actually enjoys doing group projects?', type: 'group', tags: ['school', 'work'] },
+  { id: '106', text: 'Who ghosts their group during projects?', type: 'fake', tags: ['school', 'work'] },
+  { id: '107', text: 'Who would survive an all-nighter the best?', type: 'group', tags: ['school', 'work'] },
+  { id: '108', text: 'Who falls asleep first during study sessions?', type: 'fake', tags: ['school', 'work'] },
+  { id: '109', text: 'Who would end up managing the whole project?', type: 'group', tags: ['school', 'work'] },
+  { id: '110', text: 'Who would forget the deadline completely?', type: 'fake', tags: ['school', 'work'] },
+  { id: '111', text: 'Who color-codes their notes?', type: 'group', tags: ['school', 'work'] },
+  { id: '112', text: 'Who doesn\'t even own a notebook?', type: 'fake', tags: ['school', 'work'] },
+  { id: '113', text: 'Who thrives under pressure?', type: 'group', tags: ['school', 'work'] },
+  { id: '114', text: 'Who panics when the clock hits 11:59?', type: 'fake', tags: ['school', 'work'] },
+
+  // 🏡 Lifestyle
+  { id: '115', text: 'Who would have the cleanest apartment?', type: 'group', tags: ['lifestyle'] },
+  { id: '116', text: 'Who would lose their keys in their own room?', type: 'fake', tags: ['lifestyle'] },
+  { id: '117', text: 'Who starts every morning with coffee?', type: 'group', tags: ['lifestyle'] },
+  { id: '118', text: 'Who drinks five energy drinks instead?', type: 'fake', tags: ['lifestyle'] },
+  { id: '119', text: 'Who could live without social media for a month?', type: 'group', tags: ['lifestyle'] },
+  { id: '120', text: 'Who refreshes Instagram every five minutes?', type: 'fake', tags: ['lifestyle'] },
+  { id: '121', text: 'Who has the best sense of fashion?', type: 'group', tags: ['lifestyle'] },
+  { id: '122', text: 'Who still wears socks with sandals?', type: 'fake', tags: ['lifestyle'] },
+  { id: '123', text: 'Who actually follows their New Year\'s resolutions?', type: 'group', tags: ['lifestyle'] },
+  { id: '124', text: 'Who forgets them by January 2nd?', type: 'fake', tags: ['lifestyle'] },
+
+  // 💬 Social
+  { id: '125', text: 'Who makes friends wherever they go?', type: 'group', tags: ['social'] },
+  { id: '126', text: 'Who avoids eye contact at all costs?', type: 'fake', tags: ['social'] },
+  { id: '127', text: 'Who remembers everyone\'s birthday?', type: 'group', tags: ['social'] },
+  { id: '128', text: 'Who forgets their own?', type: 'fake', tags: ['social'] },
+  { id: '129', text: 'Who throws the best parties?', type: 'group', tags: ['social'] },
+  { id: '130', text: 'Who leaves before dessert?', type: 'fake', tags: ['social'] },
+  { id: '131', text: 'Who would be the best team captain?', type: 'group', tags: ['social'] },
+  { id: '132', text: 'Who would cause the team to forfeit?', type: 'fake', tags: ['social'] },
+  { id: '133', text: 'Who gives the most pep talks?', type: 'group', tags: ['social'] },
+  { id: '134', text: 'Who tells everyone to give up early?', type: 'fake', tags: ['social'] },
+
+  // 🌍 Adventure & Risk
+  { id: '135', text: 'Who would climb a mountain for fun?', type: 'group', tags: ['adventure'] },
+  { id: '136', text: 'Who would complain about the WiFi on the mountain?', type: 'fake', tags: ['adventure'] },
+  { id: '137', text: 'Who loves spontaneous trips?', type: 'group', tags: ['adventure'] },
+  { id: '138', text: 'Who needs an itinerary for everything?', type: 'fake', tags: ['adventure'] },
+  { id: '139', text: 'Who would volunteer to go first on a roller coaster?', type: 'group', tags: ['adventure'] },
+  { id: '140', text: 'Who screams before the ride even starts?', type: 'fake', tags: ['adventure'] },
+  { id: '141', text: 'Who is most likely to go camping?', type: 'group', tags: ['adventure'] },
+  { id: '142', text: 'Who calls camping "sleeping in discomfort"?', type: 'fake', tags: ['adventure'] },
+  { id: '143', text: 'Who could survive being stranded on an island?', type: 'group', tags: ['adventure'] },
+  { id: '144', text: 'Who would accidentally burn the only food?', type: 'fake', tags: ['adventure'] },
+
+  // 🎬 Entertainment
+  { id: '145', text: 'Who knows every lyric to every song?', type: 'group', tags: ['entertainment'] },
+  { id: '146', text: 'Who hums the wrong tune confidently?', type: 'fake', tags: ['entertainment'] },
+  { id: '147', text: 'Who could win a movie trivia night?', type: 'group', tags: ['entertainment'] },
+  { id: '148', text: 'Who thinks Star Wars is a Marvel movie?', type: 'fake', tags: ['entertainment'] },
+  { id: '149', text: 'Who has the best playlist?', type: 'group', tags: ['entertainment'] },
+  { id: '150', text: 'Who only listens to elevator music?', type: 'fake', tags: ['entertainment'] },
+  { id: '151', text: 'Who dances even when there\'s no music?', type: 'group', tags: ['entertainment'] },
+  { id: '152', text: 'Who freezes every time they dance?', type: 'fake', tags: ['entertainment'] },
+  { id: '153', text: 'Who could binge-watch for 12 hours straight?', type: 'group', tags: ['entertainment'] },
+  { id: '154', text: 'Who falls asleep during episode one?', type: 'fake', tags: ['entertainment'] },
+
+  // 🤪 Silly / Embarrassing
+  { id: '155', text: 'Who would trip over flat ground?', type: 'group', tags: ['silly'] },
+  { id: '156', text: 'Who somehow always lands gracefully?', type: 'fake', tags: ['silly'] },
+  { id: '157', text: 'Who laughs at memes for hours?', type: 'group', tags: ['silly'] },
+  { id: '158', text: 'Who doesn\'t understand any memes?', type: 'fake', tags: ['silly'] },
+  { id: '159', text: 'Who would text the wrong group chat?', type: 'group', tags: ['silly'] },
+  { id: '160', text: 'Who double-checks every message?', type: 'fake', tags: ['silly'] },
+  { id: '161', text: 'Who would trip on stage at graduation?', type: 'group', tags: ['silly'] },
+  { id: '162', text: 'Who would correct everyone else\'s posture?', type: 'fake', tags: ['silly'] },
+  { id: '163', text: 'Who laughs hardest at their own jokes?', type: 'group', tags: ['silly'] },
+  { id: '164', text: 'Who stays silent even when it\'s hilarious?', type: 'fake', tags: ['silly'] },
+
+  // 🎲 Random / Creative
+  { id: '165', text: 'Who would start their own business successfully?', type: 'group', tags: ['random'] },
+  { id: '166', text: 'Who would forget to file taxes for it?', type: 'fake', tags: ['random'] },
+  { id: '167', text: 'Who is the most creative problem-solver?', type: 'group', tags: ['random'] },
+  { id: '168', text: 'Who creates more chaos than solutions?', type: 'fake', tags: ['random'] },
+  { id: '169', text: 'Who could win a game show?', type: 'group', tags: ['random'] },
+  { id: '170', text: 'Who would lose on the first question?', type: 'fake', tags: ['random'] },
+  { id: '171', text: 'Who would make the best detective?', type: 'group', tags: ['random'] },
+  { id: '172', text: 'Who would confess to a crime they didn\'t commit?', type: 'fake', tags: ['random'] },
+  { id: '173', text: 'Who could live in a tiny home happily?', type: 'group', tags: ['random'] },
+  { id: '174', text: 'Who needs five closets and two kitchens?', type: 'fake', tags: ['random'] },
+  { id: '175', text: 'Who would volunteer for a space mission?', type: 'group', tags: ['random'] },
+  { id: '176', text: 'Who would cry when the WiFi disconnects?', type: 'fake', tags: ['random'] },
+  { id: '177', text: 'Who would accidentally go viral on the internet?', type: 'group', tags: ['random'] },
+  { id: '178', text: 'Who would delete their account in embarrassment?', type: 'fake', tags: ['random'] },
+  { id: '179', text: 'Who would win a "best dressed" award?', type: 'group', tags: ['random'] },
+  { id: '180', text: 'Who would show up wearing pajamas?', type: 'fake', tags: ['random'] },
+  { id: '181', text: 'Who would survive a horror movie?', type: 'group', tags: ['random'] },
+  { id: '182', text: 'Who would check the basement alone?', type: 'fake', tags: ['random'] },
+  { id: '183', text: 'Who is most likely to invent something useful?', type: 'group', tags: ['random'] },
+  { id: '184', text: 'Who would patent something that already exists?', type: 'fake', tags: ['random'] },
+
+  // 🧩 Bonus Round — Personality Mashups
+  { id: '185', text: 'Who gives main character energy?', type: 'group', tags: ['personality'] },
+  { id: '186', text: 'Who insists they\'re just a side character?', type: 'fake', tags: ['personality'] },
+  { id: '187', text: 'Who is secretly the villain of the friend group?', type: 'fake', tags: ['personality'] },
+  { id: '188', text: 'Who would narrate their own life like a movie?', type: 'group', tags: ['personality'] },
+  { id: '189', text: 'Who could pass as a motivational speaker?', type: 'group', tags: ['personality'] },
+  { id: '190', text: 'Who demotivates everyone by accident?', type: 'fake', tags: ['personality'] },
+  { id: '191', text: 'Who is the "therapist friend"?', type: 'group', tags: ['personality'] },
+  { id: '192', text: 'Who gives advice they never follow?', type: 'fake', tags: ['personality'] },
+  { id: '193', text: 'Who would be everyone\'s favorite in a sitcom?', type: 'group', tags: ['personality'] },
+  { id: '194', text: 'Who would get written out by episode two?', type: 'fake', tags: ['personality'] },
+
+  // Extra Randoms
+  { id: '195', text: 'Who could fall asleep anywhere?', type: 'group', tags: ['lifestyle', 'silly'] },
+  { id: '196', text: 'Who can\'t sleep unless it\'s pitch dark and silent?', type: 'fake', tags: ['lifestyle', 'silly'] },
+  { id: '197', text: 'Who would host their own talk show?', type: 'group', tags: ['entertainment'] },
+  { id: '198', text: 'Who would be the awkward guest?', type: 'fake', tags: ['entertainment'] },
+  { id: '199', text: 'Who could talk their way out of any situation?', type: 'group', tags: ['personality'] },
+  { id: '200', text: 'Who would talk themselves into more trouble?', type: 'fake', tags: ['personality'] },
+  { id: '201', text: 'Who is always the first to volunteer?', type: 'group', tags: ['school', 'work'] },
+  { id: '202', text: 'Who mysteriously disappears when help is needed?', type: 'fake', tags: ['school', 'work'] },
+  { id: '203', text: 'Who would bake cookies for the team?', type: 'group', tags: ['social', 'lifestyle'] },
+  { id: '204', text: 'Who would eat all the cookies first?', type: 'fake', tags: ['social', 'lifestyle'] },
 ];
 
 // In-memory storage (replace with Redis in production)
@@ -177,7 +309,7 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ["https://fakeout.fly.dev", "https://your-custom-domain.com"] // Replace with your actual domains
+      ? ["https://fakeout.fly.dev", "https://your-custom-domain.com"] 
       : "http://localhost:5173",
     methods: ["GET", "POST"]
   }
@@ -192,14 +324,91 @@ function generatePin(): string {
 }
 
 // Get random question pair (group + fake) with diversity to avoid obvious opposites
-function getDiverseQuestionPair(): { group: Question; fake: Question } {
-  const groupQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'group');
-  const fakeQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'fake');
+// Tracks used questions to ensure all questions are used before repeating
+function getDiverseQuestionPair(room: Room): { group: Question; fake: Question } {
+  // Check if all questions have been used, reset if so
+  if (room.usedQuestionIds.size >= SAMPLE_QUESTIONS.length) {
+    console.log(`All questions used for room ${room.pin}, resetting usedQuestionIds`);
+    room.usedQuestionIds.clear();
+  }
 
-  const groupQuestion = groupQuestions[Math.floor(Math.random() * groupQuestions.length)];
+  // Filter out already used questions
+  const availableGroupQuestions = SAMPLE_QUESTIONS.filter(q => 
+    q.type === 'group' && !room.usedQuestionIds.has(q.id)
+  );
+  const availableFakeQuestions = SAMPLE_QUESTIONS.filter(q => 
+    q.type === 'fake' && !room.usedQuestionIds.has(q.id)
+  );
 
-  // Prefer fake questions that are NOT the sequential opposite and have different tags
-  const preferredPool = fakeQuestions.filter(q => {
+  // If no unused questions of one type remain, reset and use all questions
+  if (availableGroupQuestions.length === 0 || availableFakeQuestions.length === 0) {
+    console.log(`Ran out of unused questions for room ${room.pin}, resetting`);
+    room.usedQuestionIds.clear();
+    const allGroupQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'group');
+    const allFakeQuestions = SAMPLE_QUESTIONS.filter(q => q.type === 'fake');
+    
+    // Safety check
+    if (allGroupQuestions.length === 0 || allFakeQuestions.length === 0) {
+      console.error(`No questions available in question bank!`);
+      // Fallback to first available questions
+      const fallbackGroup = SAMPLE_QUESTIONS.find(q => q.type === 'group');
+      const fallbackFake = SAMPLE_QUESTIONS.find(q => q.type === 'fake');
+      if (!fallbackGroup || !fallbackFake) {
+        throw new Error('No questions available in question bank');
+      }
+      return { group: fallbackGroup, fake: fallbackFake };
+    }
+    
+    const randomGroupIndex = randomInt(0, allGroupQuestions.length);
+    const groupQuestion = allGroupQuestions[randomGroupIndex];
+    
+    // Prefer fake questions that are NOT the sequential opposite and have different tags
+    const preferredPool = allFakeQuestions.filter(q => {
+      const notOpposite = Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1;
+      const differentTag = groupQuestion.tags && q.tags
+        ? !groupQuestion.tags.some(t => (q.tags || []).includes(t))
+        : true;
+      return notOpposite && differentTag;
+    });
+
+    const fallbackPool = allFakeQuestions.filter(q => Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1);
+    const usablePool = preferredPool.length > 0 ? preferredPool : (fallbackPool.length > 0 ? fallbackPool : allFakeQuestions);
+
+    // Safety check
+    let fakeQuestion: Question;
+    if (usablePool.length === 0) {
+      console.error(`No usable fake questions found for room ${room.pin}, using fallback`);
+      const fallbackFake = allFakeQuestions[0];
+      if (!fallbackFake) {
+        throw new Error('No fake questions available');
+      }
+      fakeQuestion = fallbackFake;
+    } else {
+      const randomFakeIndex = randomInt(0, usablePool.length);
+      fakeQuestion = usablePool[randomFakeIndex];
+    }
+    
+    // Mark both questions as used
+    room.usedQuestionIds.add(groupQuestion.id);
+    room.usedQuestionIds.add(fakeQuestion.id);
+    
+    return { group: groupQuestion, fake: fakeQuestion };
+  }
+
+  // Safety check
+  if (availableGroupQuestions.length === 0 || availableFakeQuestions.length === 0) {
+    console.error(`No available questions for room ${room.pin}`);
+    // Reset and try again
+    room.usedQuestionIds.clear();
+    return getDiverseQuestionPair(room);
+  }
+
+  // Select from unused questions
+  const randomGroupIndex = randomInt(0, availableGroupQuestions.length);
+  const groupQuestion = availableGroupQuestions[randomGroupIndex];
+
+  // Prefer fake questions that are NOT the sequential opposite, have different tags, and haven't been used
+  const preferredPool = availableFakeQuestions.filter(q => {
     const notOpposite = Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1;
     const differentTag = groupQuestion.tags && q.tags
       ? !groupQuestion.tags.some(t => (q.tags || []).includes(t))
@@ -207,10 +416,28 @@ function getDiverseQuestionPair(): { group: Question; fake: Question } {
     return notOpposite && differentTag;
   });
 
-  const fallbackPool = fakeQuestions.filter(q => Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1);
-  const usablePool = preferredPool.length > 0 ? preferredPool : (fallbackPool.length > 0 ? fallbackPool : fakeQuestions);
+  const fallbackPool = availableFakeQuestions.filter(q => Math.abs(Number(q.id) - Number(groupQuestion.id)) !== 1);
+  const usablePool = preferredPool.length > 0 ? preferredPool : (fallbackPool.length > 0 ? fallbackPool : availableFakeQuestions);
 
-  const fakeQuestion = usablePool[Math.floor(Math.random() * usablePool.length)];
+  // Safety check
+  let fakeQuestion: Question;
+  if (usablePool.length === 0) {
+    console.error(`No usable fake questions found for room ${room.pin}, using fallback`);
+    const fallbackFake = availableFakeQuestions[0];
+    if (!fallbackFake) {
+      throw new Error('No fake questions available');
+    }
+    fakeQuestion = fallbackFake;
+  } else {
+    const randomFakeIndex = randomInt(0, usablePool.length);
+    fakeQuestion = usablePool[randomFakeIndex];
+  }
+
+  // Mark both questions as used
+  room.usedQuestionIds.add(groupQuestion.id);
+  room.usedQuestionIds.add(fakeQuestion.id);
+
+  console.log(`Room ${room.pin}: Used questions ${groupQuestion.id} and ${fakeQuestion.id}. Total used: ${room.usedQuestionIds.size}/${SAMPLE_QUESTIONS.length}`);
 
   return { group: groupQuestion, fake: fakeQuestion };
 }
@@ -242,6 +469,7 @@ app.post('/api/rooms', (req, res) => {
     state: 'lobby',
     currentRound: 0,
     scores: new Map(),
+    usedQuestionIds: new Set(),
     disconnectTimeouts: new Map()
   };
   
@@ -772,6 +1000,24 @@ function getUserIdFromSocket(socketId: string): string | undefined {
   return undefined;
 }
 
+// Fisher-Yates shuffle for true randomization using Node.js crypto
+function shuffleArray<T>(array: T[]): T[] {
+  if (array.length === 0) {
+    return [];
+  }
+  if (array.length === 1) {
+    return [...array];
+  }
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    // Use Node.js crypto.randomInt for cryptographically secure randomness
+    // randomInt(0, i+1) generates a number from 0 to i (inclusive)
+    const randomIndex = randomInt(0, i + 1);
+    [shuffled[i], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[i]];
+  }
+  return shuffled;
+}
+
 function startRound(room: Room) {
   room.currentRound++;
   room.state = 'answering';
@@ -783,9 +1029,34 @@ function startRound(room: Room) {
     room.resultsTimeout = undefined;
   }
   
-  const players = Array.from(room.players.keys());
-  const fakeId = players[Math.floor(Math.random() * players.length)];
-  const { group, fake } = getDiverseQuestionPair();
+  // Get all player IDs (including disconnected ones for now)
+  const playerIds = Array.from(room.players.keys());
+  console.log(`Room ${room.pin} round ${room.currentRound}: Found ${playerIds.length} total players, ${room.players.size} in map`);
+  
+  // Safety check: ensure we have players
+  if (playerIds.length === 0 || room.players.size === 0) {
+    console.error(`No players in room ${room.pin} for round ${room.currentRound}. Cannot start round.`);
+    room.state = 'lobby';
+    io.to(room.pin).emit('error', { message: 'No players available to start round' });
+    return;
+  }
+  
+  // Shuffle players array to avoid predictable patterns based on insertion order
+  const players = shuffleArray(playerIds);
+  
+  // Select random fake from shuffled array using Node.js crypto for better randomness
+  // Additional safety check
+  if (players.length === 0) {
+    console.error(`Players array is empty after shuffle for room ${room.pin}`);
+    return;
+  }
+  
+  const randomIndex = randomInt(0, players.length);
+  const fakeId = players[randomIndex];
+  
+  console.log(`Round ${room.currentRound}: Selected fake player: ${fakeId} from ${players.length} players`);
+  
+  const { group, fake } = getDiverseQuestionPair(room);
   
   room.currentRoundData = {
     fakeId,
@@ -905,7 +1176,7 @@ function calculateResults(room: Room) {
     room.voteTimeout = undefined;
   }
   
-  const { fakeId, votes } = room.currentRoundData;
+  const { fakeId, votes, fakeQuestion } = room.currentRoundData;
   
   // Count votes
   const voteCounts = new Map<string, number>();
@@ -948,6 +1219,7 @@ function calculateResults(room: Room) {
   io.to(room.pin).emit('round:result', {
     fakeId,
     fakeCaught,
+    fakeQuestion,
     votes: Array.from(votes.entries()),
     scores
   });

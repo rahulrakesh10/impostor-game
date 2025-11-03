@@ -31,6 +31,7 @@ interface GameState {
   lastResult?: {
     fakeId: string;
     fakeCaught: boolean;
+    fakeQuestion?: string;
   };
 }
 
@@ -204,7 +205,8 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         scores: data.scores,
         lastResult: {
           fakeId: data.fakeId,
-          fakeCaught: data.fakeCaught
+          fakeCaught: data.fakeCaught,
+          fakeQuestion: data.fakeQuestion
         }
       }));
       setCountdown(5); // Show results for 5 seconds
@@ -484,7 +486,9 @@ function HostLobbyScreen({
           </button>
         </div>
         
-        <QRCodeDisplay roomPin={room.pin} />
+        <div className="lobby-qr-section">
+          <QRCodeDisplay roomPin={room.pin} />
+        </div>
         
         <div className="host-info">
           <h3>🎮 Host: {gameState.user?.displayName}</h3>
@@ -547,25 +551,14 @@ function HostAnswerScreen({
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="big-timer">
-          <div className="timer-display">{timer}</div>
-          <div className="timer-label">SECONDS TO ANSWER</div>
-        </div>
-        
-        <div className="host-header">
-          <div className="header-top">
-            <h2>🎮 Host View - Answering Phase</h2>
-            <div className="room-pin-small">PIN: {room?.pin}</div>
+        <div className="host-top-bar">
+          <div className="host-timer-left">
+            <div className="timer-display-small">{timer}</div>
+            <div className="timer-label-small">SECONDS TO ANSWER</div>
           </div>
-          <div className="phase-info">
-            <span className="phase-badge">Players are answering...</span>
+          <div className="host-pin-right">
+            <div className="room-pin-display-small">PIN: {room?.pin}</div>
           </div>
-        </div>
-        
-        <div className={`question-container ${isFake ? 'fake' : 'group'}`}>
-          <h3>Current Question:</h3>
-          <p className="question-text">{question}</p>
-          {isFake && <div className="fake-badge">Fake Question</div>}
         </div>
         
         <div className="players-overview">
@@ -620,18 +613,13 @@ function HostDiscussionScreen({
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="big-timer discussion-timer">
-          <div className="timer-display">{timer}</div>
-          <div className="timer-label">SECONDS TO DISCUSS</div>
-        </div>
-        
-        <div className="host-header">
-          <div className="header-top">
-            <h2>🎮 Host View - Discussion Phase</h2>
-            <div className="room-pin-small">PIN: {room?.pin}</div>
+        <div className="host-top-bar discussion-timer-section">
+          <div className="host-timer-left">
+            <div className="timer-display-small">{timer}</div>
+            <div className="timer-label-small">SECONDS TO DISCUSS</div>
           </div>
-          <div className="phase-info">
-            <span className="phase-badge">Players are discussing...</span>
+          <div className="host-pin-right">
+            <div className="room-pin-display-small">PIN: {room?.pin}</div>
           </div>
         </div>
         
@@ -645,13 +633,13 @@ function HostDiscussionScreen({
         </div>
         
         <div className="answers-summary">
-          <h3>📝 Player Answers</h3>
-          <div className="answers-grid">
+          <h3>📝 Who Answered What</h3>
+          <div className="answers-list-improved">
             {playerAnswers.map((answer, index) => (
-              <div key={index} className="answer-item">
-                <span className="player-name">{answer.playerName}</span>
-                <span className="answer-arrow">→</span>
-                <span className="answer-target">{answer.answerName}</span>
+              <div key={index} className="answer-row-improved">
+                <span className="answer-player-name">{answer.playerName}</span>
+                <span className="answer-arrow-improved">→</span>
+                <span className="answer-target-name">{answer.answerName}</span>
               </div>
             ))}
           </div>
@@ -696,18 +684,13 @@ function HostVotingScreen({
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="big-timer voting-timer">
-          <div className="timer-display">{timer}</div>
-          <div className="timer-label">SECONDS TO VOTE</div>
-        </div>
-        
-        <div className="host-header">
-          <div className="header-top">
-            <h2>🎮 Host View - Voting Phase</h2>
-            <div className="room-pin-small">PIN: {room?.pin}</div>
+        <div className="host-top-bar voting-timer-section">
+          <div className="host-timer-left">
+            <div className="timer-display-small">{timer}</div>
+            <div className="timer-label-small">SECONDS TO VOTE</div>
           </div>
-          <div className="phase-info">
-            <span className="phase-badge">Players are voting...</span>
+          <div className="host-pin-right">
+            <div className="room-pin-display-small">PIN: {room?.pin}</div>
           </div>
         </div>
         
@@ -741,7 +724,7 @@ function HostResultsScreen({
   room
 }: {
   scores: Array<{ userId: string; displayName: string; score: number }>;
-  lastResult: { fakeId: string; fakeCaught: boolean };
+  lastResult: { fakeId: string; fakeCaught: boolean; fakeQuestion?: string };
   players: Player[];
   timer?: number;
   room?: { pin: string; players: Player[] };
@@ -751,17 +734,24 @@ function HostResultsScreen({
   return (
     <div className="screen">
       <div className="container host-container">
-        {timer && <div className="timer">Next Round: {timer}s</div>}
-        
-        <div className="host-header">
-          <div className="header-top">
-            <h2>🎮 Host View - Round Results</h2>
-            <div className="room-pin-small">PIN: {room?.pin}</div>
+        {timer && (
+          <div className="host-top-bar">
+            <div className="host-timer-left">
+              <div className="timer-display-small">Next: {timer}s</div>
+              <div className="timer-label-small">NEXT ROUND</div>
+            </div>
+            <div className="host-pin-right">
+              <div className="room-pin-display-small">PIN: {room?.pin}</div>
+            </div>
           </div>
-          <div className="phase-info">
-            <span className="phase-badge">Round Complete!</span>
+        )}
+        {!timer && (
+          <div className="host-top-bar">
+            <div className="host-pin-right" style={{ marginLeft: 'auto' }}>
+              <div className="room-pin-display-small">PIN: {room?.pin}</div>
+            </div>
           </div>
-        </div>
+        )}
         
         <div className="result-reveal">
           <h3>The Fake Was:</h3>
@@ -773,6 +763,15 @@ function HostResultsScreen({
             {lastResult.fakeCaught ? '✅ Fake Caught!' : '❌ Fake Escaped!'}
           </p>
         </div>
+        
+        {lastResult.fakeQuestion && (
+          <div className="fake-question-reveal">
+            <h3>🎭 The Impostor's Question Was:</h3>
+            <div className="fake-question-display">
+              <p className="fake-question-text">{lastResult.fakeQuestion}</p>
+            </div>
+          </div>
+        )}
         
         <div className="scores">
           <h3>📊 Current Leaderboard</h3>

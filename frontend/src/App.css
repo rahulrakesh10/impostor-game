@@ -125,9 +125,16 @@
   margin-bottom: 2rem;
 }
 
+/* Lobby QR Code Section */
+.lobby-qr-section {
+  margin: 1.5rem 0;
+  display: flex;
+  justify-content: center;
+}
+
 /* QR Code Styles */
 .qr-code-section {
-  margin: 2rem 0;
+  margin: 0;
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 1rem;

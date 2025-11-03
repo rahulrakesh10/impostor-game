@@ -30,6 +30,7 @@ interface GameState {
   lastResult?: {
     fakeId: string;
     fakeCaught: boolean;
+    fakeQuestion?: string;
   };
 }
 
@@ -213,7 +214,8 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
         scores: data.scores,
         lastResult: {
           fakeId: data.fakeId,
-          fakeCaught: data.fakeCaught
+          fakeCaught: data.fakeCaught,
+          fakeQuestion: data.fakeQuestion
         }
       }));
       setCountdown(5); // Show results for 5 seconds
@@ -730,7 +732,7 @@ function PlayerResultsScreen({
   timer
 }: {
   scores: Array<{ userId: string; displayName: string; score: number }>;
-  lastResult: { fakeId: string; fakeCaught: boolean };
+  lastResult: { fakeId: string; fakeCaught: boolean; fakeQuestion?: string };
   players: Player[];
   timer?: number;
 }) {
@@ -748,6 +750,15 @@ function PlayerResultsScreen({
             {lastResult.fakeCaught ? '✅ Fake caught!' : '❌ Fake escaped!'}
           </p>
         </div>
+        
+        {lastResult.fakeQuestion && (
+          <div className="fake-question-reveal">
+            <h3>🎭 The Impostor's Question Was:</h3>
+            <div className="fake-question-display">
+              <p className="fake-question-text">{lastResult.fakeQuestion}</p>
+            </div>
+          </div>
+        )}
         
         <div className="scores">
           <h3>Current Scores</h3>
