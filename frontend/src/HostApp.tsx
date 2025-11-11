@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import io, { Socket } from 'socket.io-client';
 import QRCode from 'qrcode';
+import { soundManager } from './sounds';
 
 interface Player {
   id: string;
@@ -146,13 +147,33 @@ function HostApp({ onGameStateChange }: HostAppProps) {
     });
 
     newSocket.on('room:update', (data) => {
-      setGameState(prev => ({
-        ...prev,
-        room: { ...prev.room!, players: data.players }
-      }));
+      console.log('Host received room:update:', data);
+      setGameState(prev => {
+        if (!prev.room) {
+          console.warn('Received room:update but no room in state');
+          return prev;
+        }
+        const oldPlayerCount = prev.room.players.length;
+        const newPlayerCount = data.players?.length || 0;
+        console.log(`Updating player list from ${oldPlayerCount} to ${newPlayerCount} players`);
+        
+        // Create a new array reference to ensure React detects the change
+        const updatedPlayers = Array.isArray(data.players) ? [...data.players] : [];
+        
+        return {
+          ...prev,
+          room: { 
+            ...prev.room, 
+            players: updatedPlayers,
+            pin: prev.room.pin // Preserve pin
+          }
+        };
+      });
     });
 
     newSocket.on('round:start', (data) => {
+      soundManager.resetTimerSoundTracking();
+      soundManager.playRoundStart();
       setGameState(prev => ({
         ...prev,
         state: 'answering',
@@ -202,6 +223,11 @@ function HostApp({ onGameStateChange }: HostAppProps) {
     });
 
     newSocket.on('round:result', (data) => {
+      if (data.fakeCaught) {
+        soundManager.playSuccess();
+      } else {
+        soundManager.playFailure();
+      }
       setGameState(prev => ({
         ...prev,
         state: 'results',
@@ -278,6 +304,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
 
   const startGame = () => {
     if (gameState.room) {
+      soundManager.playRoundStart();
       socket?.emit('game:start', { 
         pin: gameState.room.pin,
         settings: gameSettings
@@ -346,6 +373,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
             setShowTutorial(false);
           }}
           tutorialPoints={{ fakePoints: gameSettings.fakePoints, groupPoints: gameSettings.groupPoints }}
+          socket={socket}
         />
       </>
     );
@@ -360,6 +388,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         isFake={gameState.isFake!}
         playerAnswers={playerAnswers}
         room={gameState.room!}
+        socket={socket}
       />
     );
   }
@@ -372,6 +401,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         playerAnswers={playerAnswers}
         question={gameState.currentQuestion!}
         room={gameState.room!}
+        socket={socket}
         onSkipToVoting={() => {
           if (socket && gameState.room?.pin && gameState.user?.id) {
             socket.emit('discussion:skip-to-voting', { 
@@ -390,6 +420,7 @@ function HostApp({ onGameStateChange }: HostAppProps) {
         players={gameState.room!.players}
         timer={countdown}
         room={gameState.room!}
+        socket={socket}
       />
     );
   }
@@ -452,7 +483,10 @@ function HostLandingScreen({ onCreateRoom, socketConnected, error, onShowTutoria
         
         <div className="host-setup">
           <button 
-            onClick={onCreateRoom} 
+            onClick={() => {
+              soundManager.playClick();
+              onCreateRoom();
+            }}
             className="button primary"
             disabled={!socketConnected}
           >
@@ -476,7 +510,8 @@ function HostLobbyScreen({
   onShowTutorial,
   showTutorial,
   onCloseTutorial,
-  tutorialPoints
+  tutorialPoints,
+  socket
 }: { 
   room: { pin: string; players: Player[] };
   user: { isHost: boolean };
@@ -490,6 +525,7 @@ function HostLobbyScreen({
   showTutorial?: boolean;
   onCloseTutorial?: (dontShowAgain?: boolean) => void;
   tutorialPoints?: { fakePoints: number; groupPoints: number };
+  socket?: Socket | null;
 }) {
   return (
     <div className="screen">
@@ -499,6 +535,7 @@ function HostLobbyScreen({
             <h2>Room PIN: {room.pin}</h2>
             <button 
               onClick={async () => {
+                soundManager.playClick();
                 try {
                   await navigator.clipboard.writeText(room.pin);
                   // You could add a toast notification here if you have one
@@ -513,19 +550,36 @@ function HostLobbyScreen({
               📋 Copy
             </button>
           </div>
-          <button 
-            onClick={onToggleSettings}
-            className="button secondary settings-btn"
-          >
-            ⚙️ Game Settings
-          </button>
-          <button 
-            onClick={onShowTutorial}
-            className="button secondary"
-            style={{ marginLeft: '0.5rem' }}
-          >
-            ❓ How to Play
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button 
+              onClick={() => {
+                soundManager.toggle();
+                soundManager.playClick();
+              }}
+              className="button secondary"
+              title={soundManager.isEnabled() ? 'Disable sounds' : 'Enable sounds'}
+            >
+              {soundManager.isEnabled() ? '🔊' : '🔇'}
+            </button>
+            <button 
+              onClick={() => {
+                soundManager.playClick();
+                onToggleSettings();
+              }}
+              className="button secondary settings-btn"
+            >
+              ⚙️ Game Settings
+            </button>
+            <button 
+              onClick={() => {
+                soundManager.playClick();
+                onShowTutorial();
+              }}
+              className="button secondary"
+            >
+              ❓ How to Play
+            </button>
+          </div>
         </div>
         
         <div className="lobby-qr-section">
@@ -545,8 +599,8 @@ function HostLobbyScreen({
         
         <div className="players-list">
           <h3>Players ({room.players.length})</h3>
-          {room.players.map(player => (
-            <div key={player.id} className={`player-card ${player.status === 'disconnected' ? 'disconnected' : ''}`}>
+          {room.players.map((player, index) => (
+            <div key={player.id} className={`player-card ${player.status === 'disconnected' ? 'disconnected' : ''}`} style={{ '--i': index } as React.CSSProperties}>
               <div className="player-status-indicator">
                 {player.status === 'connected' ? '🟢' : '🟡'}
               </div>
@@ -554,6 +608,21 @@ function HostLobbyScreen({
               {player.status === 'disconnected' && (
                 <span className="disconnected-label">Disconnected</span>
               )}
+              <button
+                onClick={() => {
+                  soundManager.playClick();
+                  if (window.confirm(`Kick ${player.displayName} from the game?`)) {
+                    socket?.emit('player:kick', { 
+                      pin: room.pin, 
+                      targetUserId: player.id 
+                    });
+                  }
+                }}
+                className="kick-player-btn"
+                title={`Kick ${player.displayName}`}
+              >
+                🚪
+              </button>
             </div>
           ))}
         </div>
@@ -579,7 +648,8 @@ function HostAnswerScreen({
   timer,
   isFake,
   playerAnswers,
-  room
+  room,
+  socket
 }: {
   question: string;
   players: Player[];
@@ -592,13 +662,29 @@ function HostAnswerScreen({
     answerName: string;
   }>;
   room?: { pin: string; players: Player[] };
+  socket?: Socket | null;
 }) {
+  const isUrgent = timer <= 3;
+
+  // Play sound effects for timer urgency
+  useEffect(() => {
+    if (timer > 0 && timer <= 3) {
+      if (timer === 1) {
+        soundManager.playTimerCritical(timer);
+      } else if (timer === 2 || timer === 3) {
+        soundManager.playTimerWarning(timer);
+      }
+    } else if (timer > 3) {
+      soundManager.resetTimerSoundTracking();
+    }
+  }, [timer]);
+
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="host-top-bar">
+        <div className={`host-top-bar ${isUrgent ? 'timer-urgent' : ''}`}>
           <div className="host-timer-left">
-            <div className="timer-display-small">{timer}</div>
+            <div className={`timer-display-small ${isUrgent ? 'timer-urgent-display' : ''}`}>{timer}</div>
             <div className="timer-label-small">SECONDS TO ANSWER</div>
           </div>
           <div className="host-pin-right">
@@ -609,10 +695,10 @@ function HostAnswerScreen({
         <div className="players-overview">
           <h3>Players ({players.length})</h3>
           <div className="players-grid">
-            {players.map(player => {
+            {players.map((player, index) => {
               const answer = playerAnswers.find(a => a.playerId === player.id);
               return (
-                <div key={player.id} className={`player-status ${player.status === 'disconnected' ? 'disconnected' : ''}`}>
+                <div key={player.id} className={`player-status ${player.status === 'disconnected' ? 'disconnected' : ''}`} style={{ '--i': index } as React.CSSProperties}>
                   <div className="player-avatar">👤</div>
                   <span>{player.displayName}</span>
                   <div className="connection-status">
@@ -625,6 +711,21 @@ function HostAnswerScreen({
                       <span className="waiting-status">⏳</span>
                     )}
                   </div>
+                  <button
+                    onClick={() => {
+                      soundManager.playClick();
+                      if (window.confirm(`Kick ${player.displayName} from the game?`)) {
+                        socket?.emit('player:kick', { 
+                          pin: room?.pin, 
+                          targetUserId: player.id 
+                        });
+                      }
+                    }}
+                    className="kick-player-btn"
+                    title={`Kick ${player.displayName}`}
+                  >
+                    🚪
+                  </button>
                 </div>
               );
             })}
@@ -641,7 +742,8 @@ function HostDiscussionScreen({
   playerAnswers,
   question,
   onSkipToVoting,
-  room
+  room,
+  socket
 }: {
   players: Player[];
   timer: number;
@@ -654,13 +756,29 @@ function HostDiscussionScreen({
   question: string;
   onSkipToVoting?: () => void;
   room?: { pin: string; players: Player[] };
+  socket?: Socket | null;
 }) {
+  const isUrgent = timer <= 3;
+
+  // Play sound effects for timer urgency
+  useEffect(() => {
+    if (timer > 0 && timer <= 3) {
+      if (timer === 1) {
+        soundManager.playTimerCritical(timer);
+      } else if (timer <= 3) {
+        soundManager.playTimerWarning(timer);
+      }
+    } else if (timer > 3) {
+      soundManager.resetTimerSoundTracking();
+    }
+  }, [timer]);
+
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="host-top-bar discussion-timer-section">
+        <div className={`host-top-bar discussion-timer-section ${isUrgent ? 'timer-urgent' : ''}`}>
           <div className="host-timer-left">
-            <div className="timer-display-small">{timer}</div>
+            <div className={`timer-display-small ${isUrgent ? 'timer-urgent-display' : ''}`}>{timer}</div>
             <div className="timer-label-small">SECONDS TO DISCUSS</div>
           </div>
           <div className="host-pin-right">
@@ -693,11 +811,26 @@ function HostDiscussionScreen({
         <div className="players-overview">
           <h3>Players ({players.length})</h3>
           <div className="players-grid">
-            {players.map(player => (
-              <div key={player.id} className="player-status">
+            {players.map((player, index) => (
+              <div key={player.id} className="player-status" style={{ '--i': index } as React.CSSProperties}>
                 <div className="player-avatar">👤</div>
                 <span>{player.displayName}</span>
                 <div className="status-indicator">💬</div>
+                <button
+                  onClick={() => {
+                    soundManager.playClick();
+                    if (window.confirm(`Kick ${player.displayName} from the game?`)) {
+                      socket?.emit('player:kick', { 
+                        pin: room?.pin, 
+                        targetUserId: player.id 
+                      });
+                    }
+                  }}
+                  className="kick-player-btn"
+                  title={`Kick ${player.displayName}`}
+                >
+                  🚪
+                </button>
               </div>
             ))}
           </div>
@@ -706,7 +839,10 @@ function HostDiscussionScreen({
         <div className="host-actions">
           <button 
             className="skip-button host-skip-button"
-            onClick={onSkipToVoting}
+            onClick={() => {
+              soundManager.playClick();
+              onSkipToVoting?.();
+            }}
             title="Skip to voting phase if players are ready"
           >
             ⏭️ Skip to Voting
@@ -720,18 +856,35 @@ function HostDiscussionScreen({
 function HostVotingScreen({
   players,
   timer,
-  room
+  room,
+  socket
 }: {
   players: Player[];
   timer: number;
   room?: { pin: string; players: Player[] };
+  socket?: Socket | null;
 }) {
+  const isUrgent = timer <= 3;
+
+  // Play sound effects for timer urgency
+  useEffect(() => {
+    if (timer > 0 && timer <= 3) {
+      if (timer === 1) {
+        soundManager.playTimerCritical(timer);
+      } else if (timer <= 3) {
+        soundManager.playTimerWarning(timer);
+      }
+    } else if (timer > 3) {
+      soundManager.resetTimerSoundTracking();
+    }
+  }, [timer]);
+
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="host-top-bar voting-timer-section">
+        <div className={`host-top-bar voting-timer-section ${isUrgent ? 'timer-urgent' : ''}`}>
           <div className="host-timer-left">
-            <div className="timer-display-small">{timer}</div>
+            <div className={`timer-display-small ${isUrgent ? 'timer-urgent-display' : ''}`}>{timer}</div>
             <div className="timer-label-small">SECONDS TO VOTE</div>
           </div>
           <div className="host-pin-right">
@@ -747,11 +900,26 @@ function HostVotingScreen({
         <div className="players-overview">
           <h3>Players ({players.length})</h3>
           <div className="players-grid">
-            {players.map(player => (
-              <div key={player.id} className="player-status">
+            {players.map((player, index) => (
+              <div key={player.id} className="player-status" style={{ '--i': index } as React.CSSProperties}>
                 <div className="player-avatar">👤</div>
                 <span>{player.displayName}</span>
                 <div className="status-indicator">🗳️</div>
+                <button
+                  onClick={() => {
+                    soundManager.playClick();
+                    if (window.confirm(`Kick ${player.displayName} from the game?`)) {
+                      socket?.emit('player:kick', { 
+                        pin: room?.pin, 
+                        targetUserId: player.id 
+                      });
+                    }
+                  }}
+                  className="kick-player-btn"
+                  title={`Kick ${player.displayName}`}
+                >
+                  🚪
+                </button>
               </div>
             ))}
           </div>

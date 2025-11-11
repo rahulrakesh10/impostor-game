@@ -1,6 +1,7 @@
 // frontend/src/PlayerApp.tsx - Player-specific interface
 import React, { useState, useEffect, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
+import { soundManager } from './sounds';
 
 interface Player {
   id: string;
@@ -159,6 +160,8 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
     });
 
     newSocket.on('round:start', (data) => {
+      soundManager.resetTimerSoundTracking();
+      soundManager.playRoundStart();
       setGameState(prev => ({
         ...prev,
         state: 'answering',
@@ -208,6 +211,11 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
     });
 
     newSocket.on('round:result', (data) => {
+      if (data.fakeCaught) {
+        soundManager.playSuccess();
+      } else {
+        soundManager.playFailure();
+      }
       setGameState(prev => ({
         ...prev,
         state: 'results',
@@ -243,6 +251,19 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
     newSocket.on('error', (data) => {
       setError(data.message);
       setGameState(prev => ({ ...prev, state: 'landing' }));
+    });
+
+    newSocket.on('player:kicked', (data) => {
+      setError(data.message || 'You have been kicked from the game by the host');
+      // Redirect to landing screen after a short delay
+      setTimeout(() => {
+        setGameState({
+          state: 'landing',
+          user: { id: '', displayName: '', isHost: false },
+          room: undefined
+        });
+        setError('');
+      }, 3000);
     });
 
     return () => {
@@ -309,6 +330,7 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
 
   const submitAnswer = () => {
     if (selectedAnswer && gameState.room) {
+      soundManager.playSubmit();
       console.log('Submitting answer:', selectedAnswer);
       socket?.emit('answer:submit', { 
         pin: gameState.room.pin, 
@@ -320,6 +342,7 @@ function PlayerApp({ onGameStateChange }: PlayerAppProps) {
 
   const submitVote = () => {
     if (selectedAnswer && gameState.room) {
+      soundManager.playSubmit();
       console.log('Submitting vote:', selectedAnswer);
       socket?.emit('vote:submit', { 
         pin: gameState.room.pin, 
@@ -545,8 +568,8 @@ function PlayerLobbyScreen({
         
         <div className="players-list">
           <h3>Players ({room.players.length})</h3>
-          {room.players.map(player => (
-            <div key={player.id} className="player-card">
+          {room.players.map((player, index) => (
+            <div key={player.id} className="player-card" style={{ '--i': index } as React.CSSProperties}>
               {player.displayName}
             </div>
           ))}
@@ -577,17 +600,36 @@ function PlayerAnswerScreen({
   timer?: number;
   playerName?: string;
 }) {
+  const isUrgent = timer !== undefined && timer <= 3;
+
+  // Play sound effects for timer urgency
+  useEffect(() => {
+    if (timer !== undefined && timer > 0 && timer <= 3) {
+      if (timer === 1) {
+        soundManager.playTimerCritical(timer);
+      } else if (timer === 2 || timer === 3) {
+        soundManager.playTimerWarning(timer);
+      }
+    } else if (timer !== undefined && timer > 3) {
+      soundManager.resetTimerSoundTracking();
+    }
+  }, [timer]);
+
   return (
     <div className="screen">
-      <div className="container">
-        {/* Player name in top right corner */}
+      <div className={`container ${timer !== undefined ? 'has-timer' : ''}`}>
+        {/* Player name in top left corner */}
         {playerName && (
           <div className="player-name-corner">
             👤 {playerName}
           </div>
         )}
         
-        {timer && <div className="timer">Time: {timer}s</div>}
+        {timer !== undefined && (
+          <div className={`timer ${isUrgent ? 'timer-urgent-player' : ''}`}>
+            Time: {timer}s
+          </div>
+        )}
         
         <div className={`question-container`}>
           <h2>{question}</h2>
@@ -595,11 +637,15 @@ function PlayerAnswerScreen({
         </div>
         
         <div className="players-grid">
-          {players.map(player => (
+          {players.map((player, index) => (
             <button
               key={player.id}
               className={`player-button ${selectedAnswer === player.id ? 'selected' : ''}`}
-              onClick={() => onSelectAnswer(player.id)}
+              onClick={() => {
+                soundManager.playClick();
+                onSelectAnswer(player.id);
+              }}
+              style={{ '--i': index } as React.CSSProperties}
             >
               {player.displayName}
             </button>
@@ -629,15 +675,17 @@ function PlayerDiscussionScreen({
 }) {
   return (
     <div className="screen">
-      <div className="container">
-        {/* Player name in top right corner */}
+      <div className={`container ${timer !== undefined && timer > 0 ? 'has-timer' : ''}`}>
+        {/* Player name in top left corner */}
         {playerName && (
           <div className="player-name-corner">
             👤 {playerName}
           </div>
         )}
         
-        {timer && <div className="timer discussion-timer">Discussion Time: {timer}s</div>}
+        {timer !== undefined && timer > 0 && (
+          <div className="timer discussion-timer">Discussion Time: {timer}s</div>
+        )}
         
         <div className="discussion-content">
           <h2>Discussion Phase</h2>
@@ -687,26 +735,49 @@ function PlayerVotingScreen({
   timer?: number;
   playerName?: string;
 }) {
+  const isUrgent = timer !== undefined && timer <= 3;
+
+  // Play sound effects for timer urgency
+  useEffect(() => {
+    if (timer !== undefined && timer > 0 && timer <= 3) {
+      if (timer === 1) {
+        soundManager.playTimerCritical(timer);
+      } else if (timer === 2 || timer === 3) {
+        soundManager.playTimerWarning(timer);
+      }
+    } else if (timer !== undefined && timer > 3) {
+      soundManager.resetTimerSoundTracking();
+    }
+  }, [timer]);
+
   return (
     <div className="screen">
-      <div className="container">
-        {/* Player name in top right corner */}
+      <div className={`container ${timer !== undefined ? 'has-timer' : ''}`}>
+        {/* Player name in top left corner */}
         {playerName && (
           <div className="player-name-corner">
             👤 {playerName}
           </div>
         )}
         
-        {timer && <div className="timer voting-timer">Voting Time: {timer}s</div>}
+        {timer !== undefined && (
+          <div className={`timer voting-timer ${isUrgent ? 'timer-urgent-player' : ''}`}>
+            Voting Time: {timer}s
+          </div>
+        )}
         
         <h2>Who is the fake?</h2>
         
         <div className="players-grid">
-          {players.map(player => (
+          {players.map((player, index) => (
             <button
               key={player.id}
               className={`player-button ${selectedVote === player.id ? 'selected' : ''}`}
-              onClick={() => onSelectVote(player.id)}
+              onClick={() => {
+                soundManager.playClick();
+                onSelectVote(player.id);
+              }}
+              style={{ '--i': index } as React.CSSProperties}
             >
               {player.displayName}
             </button>

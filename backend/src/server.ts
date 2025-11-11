@@ -655,6 +655,7 @@ io.on('connection', (socket) => {
     // Host doesn't join as a player - they just connect to manage the room
     userSockets.set(userId, socket.id);
     socket.join(pin);
+    console.log(`Host socket ${socket.id} joined room ${pin}`);
     
     // Send current room state to host
     const players = Array.from(room.players.values()).map(p => ({
@@ -665,7 +666,7 @@ io.on('connection', (socket) => {
     
     socket.emit('room:joined', { roomId: room.id, pin });
     socket.emit('room:update', { players, state: room.state });
-    console.log(`Host successfully joined room ${pin}`);
+    console.log(`Host successfully joined room ${pin} and received initial state with ${players.length} players`);
   });
 
   // Allow clients to re-identify after reconnect to refresh their socket mapping
@@ -942,6 +943,82 @@ io.on('connection', (socket) => {
     
     // Start voting phase immediately
     startVoting(room);
+  });
+
+  socket.on('player:kick', (data) => {
+    const { pin, targetUserId } = data;
+    const room = rooms.get(pin);
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+    
+    // Verify the requester is the host
+    const requesterUserId = getUserIdFromSocket(socket.id);
+    if (requesterUserId !== room.hostUserId) {
+      socket.emit('error', { message: 'Only the host can kick players' });
+      return;
+    }
+    
+    // Prevent host from kicking themselves (host is not in players map)
+    const targetPlayer = room.players.get(targetUserId);
+    if (!targetPlayer) {
+      socket.emit('error', { message: 'Player not found' });
+      return;
+    }
+    
+    console.log(`Host ${requesterUserId} kicking player ${targetPlayer.displayName} (${targetUserId}) from room ${pin}`);
+    
+    // Cancel any disconnect timeout for this player
+    if (room.disconnectTimeouts?.has(targetUserId)) {
+      clearTimeout(room.disconnectTimeouts.get(targetUserId)!);
+      room.disconnectTimeouts.delete(targetUserId);
+    }
+    
+    // Remove player from room
+    room.players.delete(targetUserId);
+    room.scores.delete(targetUserId);
+    
+    // Remove from current round data if present
+    if (room.currentRoundData) {
+      room.currentRoundData.answers.delete(targetUserId);
+      room.currentRoundData.votes.delete(targetUserId);
+    }
+    
+    // Disconnect the player's socket
+    const targetSocketId = targetPlayer.socketId;
+    if (targetSocketId) {
+      const targetSocket = io.sockets.sockets.get(targetSocketId);
+      if (targetSocket) {
+        targetSocket.emit('player:kicked', { message: 'You have been kicked from the game by the host' });
+        targetSocket.leave(room.pin);
+      }
+    }
+    
+    // Remove from userSockets
+    userSockets.delete(targetUserId);
+    
+    // Broadcast updated player list to all remaining players (including host)
+    const players = Array.from(room.players.values()).map(p => ({
+      id: p.id,
+      displayName: p.displayName,
+      status: p.status
+    }));
+    
+    console.log(`Broadcasting room:update to room ${pin} with ${players.length} players`);
+    io.to(room.pin).emit('room:update', { players, state: room.state });
+    
+    // Also explicitly send to the host socket to ensure they get the update
+    const hostSocketId = userSockets.get(room.hostUserId);
+    if (hostSocketId) {
+      const hostSocket = io.sockets.sockets.get(hostSocketId);
+      if (hostSocket) {
+        console.log(`Explicitly sending room:update to host socket ${hostSocketId}`);
+        hostSocket.emit('room:update', { players, state: room.state });
+      }
+    }
+    
+    console.log(`Player ${targetPlayer.displayName} (${targetUserId}) was kicked from room ${pin} by host`);
   });
 
   socket.on('disconnect', () => {
