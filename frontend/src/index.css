@@ -176,18 +176,6 @@ body::after {
   }
 }
 
-.container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 5px;
-  background: linear-gradient(90deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff6b6b);
-  background-size: 300% 100%;
-  animation: rainbow 2s linear infinite;
-  box-shadow: 0 0 20px rgba(255, 107, 107, 0.6), 0 0 40px rgba(78, 205, 196, 0.4);
-}
 
 .title {
   font-size: 2.5rem;
@@ -709,9 +697,10 @@ body::after {
 }
 
 .score-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
+  gap: 1rem;
   padding: 12px;
   background: #f7fafc;
   border-radius: 8px;
@@ -762,17 +751,22 @@ body::after {
 .score-row .rank {
   font-weight: 700;
   color: #667eea;
-  margin-right: 1rem;
+  min-width: 3rem;
+  text-align: left;
 }
 
 .score-row .name {
-  flex: 1;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .score-row .score {
   font-weight: 700;
   font-size: 1.2rem;
+  text-align: right;
+  min-width: 3rem;
 }
 
 .final-scores {
@@ -1030,12 +1024,22 @@ body::after {
 }
 
 /* Use discussion timer color when in discussion phase */
+.discussion-timer-section {
+  background: linear-gradient(135deg, rgba(72, 187, 120, 0.15), rgba(56, 178, 172, 0.15)) !important;
+  border-color: rgba(72, 187, 120, 0.3) !important;
+}
+
 .discussion-timer-section .host-timer-left .timer-display-small {
   color: #48bb78 !important;
   text-shadow: 0 0 10px rgba(72, 187, 120, 0.2);
 }
 
 /* Use voting timer color when in voting phase */
+.voting-timer-section {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(139, 92, 246, 0.15)) !important;
+  border-color: rgba(102, 126, 234, 0.3) !important;
+}
+
 .voting-timer-section .host-timer-left .timer-display-small {
   color: #667eea !important;
   text-shadow: 0 0 10px rgba(102, 126, 234, 0.2);
