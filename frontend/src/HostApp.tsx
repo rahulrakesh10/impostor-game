@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import io, { Socket } from 'socket.io-client';
 import QRCode from 'qrcode';
 import { soundManager } from './sounds';
+import GroupGif from './Group.gif';
+import PointGif from './point.gif';
 
 interface Player {
   id: string;
@@ -1301,88 +1303,255 @@ function TutorialCarouselModal({ onClose, fakePoints, groupPoints }: { onClose: 
   const fp = typeof fakePoints === 'number' ? fakePoints : 3;
   const gp = typeof groupPoints === 'number' ? groupPoints : 1;
 
+  const SlideLayout = ({
+    title,
+    description,
+    children
+  }: {
+    title: React.ReactNode;
+    description?: React.ReactNode;
+    children: React.ReactNode;
+  }) => (
+    <div
+      style={{
+        textAlign: 'center',
+        minHeight: 480,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 24,
+        padding: '24px 24px 16px'
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center' }}>
+        <div style={{ fontSize: 32, fontWeight: 700 }}>{title}</div>
+        {description && (
+          <div style={{ fontSize: 16, color: '#475569', fontWeight: 500, maxWidth: 420 }}>{description}</div>
+        )}
+      </div>
+      <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>{children}</div>
+      <div style={{ height: 1 }} />
+    </div>
+  );
+
+  const Card = ({
+    children,
+    background = '#fff',
+    minWidth = 220
+  }: {
+    children: React.ReactNode;
+    background?: string;
+    minWidth?: number;
+  }) => (
+    <div
+      style={{
+        padding: 24,
+        borderRadius: 20,
+        background,
+        boxShadow: '0 10px 30px rgba(15,23,42,0.1)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 12,
+        minWidth
+      }}
+    >
+      {children}
+    </div>
+  );
+
   const slides: Array<React.ReactNode> = [
     (
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 56, marginBottom: 12 }}>🎭 Fake Out</div>
-        <div style={{ fontSize: 18, opacity: 0.8 }}>Spot the impostor. Don’t get fooled.</div>
-        <div style={{ marginTop: 24, display: 'flex', justifyContent: 'center', gap: 16 }}>
-          <div style={{ padding: 12, borderRadius: 12, background: 'var(--color-muted, #eef2ff)', minWidth: 180 }}>
-            <div style={{ fontSize: 36 }}>🖥️</div>
-            <div>Host runs the game</div>
-          </div>
-          <div style={{ padding: 12, borderRadius: 12, background: 'var(--color-muted, #eef2ff)', minWidth: 180 }}>
-            <div style={{ fontSize: 36 }}>📱</div>
-            <div>Players join on phones</div>
-          </div>
+      <SlideLayout
+        title="🎭 Fake Out"
+        description="Spot the impostor. Don't get fooled."
+      >
+        <div style={{ display: 'flex', gap: 24 }}>
+          <Card background="linear-gradient(135deg, #eef2ff, #e0e7ff)">
+            <div style={{ fontSize: 48 }}>🖥️</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Host runs the game</div>
+          </Card>
+          <Card background="linear-gradient(135deg, #eef2ff, #e0e7ff)">
+            <div style={{ fontSize: 48 }}>📱</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#1e293b' }}>Players join on phones</div>
+          </Card>
         </div>
-      </div>
+      </SlideLayout>
     ),
     (
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>Create a Room & Share</div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 24, alignItems: 'center' }}>
-          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 18, marginBottom: 6 }}>Room PIN</div>
-            <div style={{ fontSize: 36, letterSpacing: 4 }}>1 2 3 4 5 6</div>
-          </div>
-          <div style={{ fontSize: 80 }}>🔗</div>
-          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 18, marginBottom: 6 }}>QR Code</div>
-            <div style={{ width: 120, height: 120, background: 'linear-gradient(135deg, #e5e7eb, #cbd5e1)', borderRadius: 8 }} />
-          </div>
+      <SlideLayout
+        title="Create a Room & Share"
+        description="Players scan or enter the PIN to join."
+      >
+        <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+          <Card>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#64748b' }}>Room PIN</div>
+            <div style={{ fontSize: 42, letterSpacing: 4, fontWeight: 700, color: '#0f172a' }}>1 2 3 4 5 6</div>
+          </Card>
+          <div style={{ fontSize: 56 }}>🔗</div>
+          <Card>
+            <div style={{ fontSize: 16, fontWeight: 600, color: '#64748b' }}>QR Code</div>
+            <div style={{ width: 160, height: 160, background: 'linear-gradient(135deg, #e5e7eb, #cbd5e1)', borderRadius: 12 }} />
+          </Card>
         </div>
-        <div style={{ marginTop: 12, opacity: 0.8 }}>Players scan or enter the PIN to join.</div>
-      </div>
+      </SlideLayout>
     ),
     (
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>Answer Phase</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
-          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 16, opacity: 0.7, marginBottom: 8 }}>Group Question</div>
-            <div style={{ fontSize: 18 }}>What’s the best movie snack?</div>
-          </div>
-          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 16, opacity: 0.7, marginBottom: 8 }}>Impostor Question</div>
-            <div style={{ fontSize: 18 }}>What’s your favorite pizza topping?</div>
-          </div>
-        </div>
-        <div style={{ marginTop: 12, opacity: 0.8 }}>One player secretly gets a different question.</div>
-      </div>
-    ),
-    (
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>Discuss</div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-          <div style={{ fontSize: 36 }}>💬</div>
-          <div style={{ fontSize: 36 }}>🕵️</div>
-          <div style={{ fontSize: 36 }}>🤔</div>
-        </div>
-        <div style={{ marginTop: 12, opacity: 0.8 }}>Share reasoning and look for inconsistencies. Host can skip to voting.</div>
-      </div>
-    ),
-    (
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 28, marginBottom: 8 }}>Vote & Score</div>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, alignItems: 'center' }}>
-          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 18, marginBottom: 6 }}>Vote for the impostor</div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb' }} />
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb' }} />
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#e5e7eb' }} />
+      <SlideLayout
+        title="Answer Phase"
+        description="Most players get the same question. One gets a different one!"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20, width: '100%' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 12 }}>
+              <div style={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 40,
+                boxShadow: '0 8px 24px rgba(102, 126, 234, 0.35)',
+                border: '4px solid white'
+              }}>👤</div>
+              <div style={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #667eea, #764ba2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 40,
+                boxShadow: '0 8px 24px rgba(102, 126, 234, 0.35)',
+                border: '4px solid white'
+              }}>👤</div>
+            </div>
+            <div style={{
+              padding: '20px 24px',
+              borderRadius: 16,
+              background: 'linear-gradient(135deg, #e0f2fe, #bae6fd)',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.1)',
+              maxWidth: 400,
+              border: '2px solid #0ea5e9'
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#0369a1', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Group Question</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#0c4a6e' }}>What's the best movie snack?</div>
             </div>
           </div>
-          <div style={{ fontSize: 64 }}>➡️</div>
-          <div style={{ padding: 16, borderRadius: 16, background: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,0.08)' }}>
-            <div style={{ fontSize: 18, marginBottom: 6 }}>Scoring</div>
-            <div>Impostor +{fp} if not caught</div>
-            <div>Group +{gp} if caught</div>
+
+          <div style={{ fontSize: 32, opacity: 0.6 }}>VS</div>
+
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+              <div style={{
+                width: 80,
+                height: 80,
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 40,
+                boxShadow: '0 12px 28px rgba(245, 158, 11, 0.4)',
+                border: '4px solid white',
+                position: 'relative'
+              }}>
+                🎭
+                <div style={{
+                  position: 'absolute',
+                  top: -8,
+                  right: -8,
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: 'white',
+                  boxShadow: '0 6px 16px rgba(239, 68, 68, 0.55)'
+                }}>!</div>
+              </div>
+            </div>
+            <div style={{
+              padding: '20px 24px',
+              borderRadius: 16,
+              background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+              boxShadow: '0 6px 18px rgba(245, 158, 11, 0.2)',
+              maxWidth: 400,
+              border: '2px solid #f59e0b'
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: '#92400e', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>🎭 Impostor Question</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#78350f' }}>What's your favorite pizza topping?</div>
+            </div>
           </div>
         </div>
-        <div style={{ marginTop: 12, opacity: 0.8 }}>Leaderboards update every round.</div>
-      </div>
+      </SlideLayout>
+    ),
+    (
+      <SlideLayout
+        title="Discuss"
+        description="Talk it out, compare answers, and spot the person who doesn't quite line up. Host can skip straight to voting when the group is ready."
+      >
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <img
+            src={GroupGif}
+            alt="Players discussing"
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+              borderRadius: 16,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              maxHeight: '300px'
+            }}
+          />
+        </div>
+      </SlideLayout>
+    ),
+    (
+      <SlideLayout
+        title="Vote & Score"
+        description="Leaderboards update every round."
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <img
+            src={PointGif}
+            alt="Time to vote"
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+              borderRadius: 16,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+              maxHeight: '250px'
+            }}
+          />
+          <div style={{ fontSize: 18, color: '#0f172a', fontWeight: 600 }}>
+            It's time to vote! Point out who you think is the impostor.
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <Card>
+              <div style={{ fontSize: 18, marginBottom: 12, fontWeight: 600, color: '#0f172a' }}>Vote for the impostor</div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e5e7eb', border: '3px solid #cbd5e1' }} />
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e5e7eb', border: '3px solid #cbd5e1' }} />
+                <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#e5e7eb', border: '3px solid #cbd5e1' }} />
+              </div>
+            </Card>
+            <div style={{ fontSize: 48 }}>➡️</div>
+            <Card>
+              <div style={{ fontSize: 18, marginBottom: 12, fontWeight: 600, color: '#0f172a' }}>Scoring</div>
+              <div style={{ fontSize: 16, marginBottom: 6, color: '#475569' }}>Impostor +{fp} if not caught</div>
+              <div style={{ fontSize: 16, color: '#475569' }}>Group +{gp} if caught</div>
+            </Card>
+          </div>
+        </div>
+      </SlideLayout>
     )
   ];
 
