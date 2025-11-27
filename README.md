@@ -1,6 +1,7 @@
 # 🎭 Fake Out Game
 
 A real-time multiplayer party game where players try to identify the impostor among them! Built with React 19, TypeScript, Node.js, and Socket.IO. Deployed on Fly.io with Docker containerization.
+Play the game right now: https://fakeout.fly.dev/
 
 ## 🎮 Game Overview
 
