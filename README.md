@@ -47,13 +47,6 @@ Play the game right now: https://fakeout.fly.dev/
 - npm or yarn
 - Docker (optional, for containerized deployment)
 
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/rahulrakesh10/impostor-game.git
-   cd impostor-game
-   ```
 
 2. **Install backend dependencies**
    ```bash
