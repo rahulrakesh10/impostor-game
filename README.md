@@ -40,7 +40,6 @@ Play the game right now: https://fakeout.fly.dev/
 - **Player Screen**: Mobile-friendly for phones
 - **Mode switching**: Easy toggle between host and player modes
 
-## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js (v18 or higher) - required for backend
