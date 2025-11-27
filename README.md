@@ -41,11 +41,6 @@ Play the game right now: https://fakeout.fly.dev/
 - **Mode switching**: Easy toggle between host and player modes
 
 
-### Prerequisites
-- Node.js (v18 or higher) - required for backend
-- npm or yarn
-- Docker (optional, for containerized deployment)
-
 
 2. **Install backend dependencies**
    ```bash
