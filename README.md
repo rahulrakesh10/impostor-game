@@ -242,13 +242,6 @@ This project is open source and available under the [MIT License](LICENSE).
 
 Try the game online at: **https://fakeout.fly.dev**
 
-## 📞 Support
-
-If you encounter any issues or have questions:
-- Open an issue on GitHub
-- Check the troubleshooting section above
-- Review the game settings and configuration
-- Test with the live demo first
 
 ## 🏗️ Development Status
 
