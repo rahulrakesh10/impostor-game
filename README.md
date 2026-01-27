@@ -193,4 +193,3 @@ Try the game online at: **https://fakeout.fly.dev**
 
 ---
 
-**Have fun playing Fake Out! 🎉**
