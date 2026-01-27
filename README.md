@@ -159,19 +159,6 @@ impostor-game/
 └── README.md                  # Project documentation
 ```
 
-## 🎨 Customization
-
-### Adding New Themes
-1. Add CSS variables to `frontend/src/index.css`
-2. Create new `[data-theme="your-theme"]` section
-3. Update theme options in `HostApp.tsx`
-
-### Modifying Game Logic
-- **Backend**: Edit `backend/src/server.ts`
-- **Frontend**: Modify `HostApp.tsx` and `PlayerApp.tsx`
-- **Styling**: Update `frontend/src/index.css`
-
-
 ## 🌐 Live Demo
 
 Try the game online at: **https://fakeout.fly.dev**
