@@ -180,12 +180,6 @@ impostor-game/
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 🙏 Acknowledgments
-
-- Built with React, TypeScript, Node.js, and Socket.IO
-- Inspired by social deduction games like Among Us
-- UI design inspired by modern party games like Kahoot
-
 ## 🌐 Live Demo
 
 Try the game online at: **https://fakeout.fly.dev**
