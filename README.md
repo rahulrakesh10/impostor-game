@@ -40,7 +40,6 @@ Play the game right now: https://fakeout.fly.dev/
 - **Player Screen**: Mobile-friendly for phones
 - **Mode switching**: Easy toggle between host and player modes
 
-
 ### Production Architecture
 
 - **Frontend**: Built with Vite and served by nginx
