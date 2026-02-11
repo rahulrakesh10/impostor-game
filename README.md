@@ -40,6 +40,105 @@ Play the game right now: https://fakeout.fly.dev/
 - **Player Screen**: Mobile-friendly for phones
 - **Mode switching**: Easy toggle between host and player modes
 
+### 📲 Mobile app (Expo)
+- **Players** use the Expo app: run `npx expo start` in the `mobile` folder and scan the QR code with Expo Go.
+- For local dev on a physical device, set EXPO_PUBLIC_SOCKET_URL to your machine IP (e.g. http://192.168.1.5:3001) in mobile/src/config.ts or via env.
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js (v18 or higher) - required for backend
+- npm or yarn
+- Docker (optional, for containerized deployment)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/rahulrakesh10/impostor-game.git
+   cd impostor-game
+   ```
+
+2. **Install backend dependencies**
+   ```bash
+   cd backend
+   npm install
+   ```
+
+3. **Install web frontend (host)**
+   ```bash
+   cd ../frontend
+   npm install
+   ```
+
+4. **Install mobile app (players)**
+   ```bash
+   cd ../mobile
+   npm install
+   ```
+
+### Running the Game
+
+1. **Start the backend server**
+   ```bash
+   cd backend
+   npm run dev
+   ```
+   Server runs on `http://localhost:3001`
+
+2. **Start the host (web)**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+   Open `http://localhost:5173` in a browser and choose **Host Game**. Share the room PIN with players.
+
+3. **Run the player app (mobile)**
+   ```bash
+   cd mobile
+   npx expo start
+   ```
+   Scan the QR code with Expo Go (Android) or the Camera app (iOS). In the app, enter the room PIN and your name to join.
+   - **On a physical device**: To use your local backend, set the backend URL to your machine’s IP (e.g. `http://192.168.1.5:3001`) via environment variable `EXPO_PUBLIC_SOCKET_URL` or change `mobile/src/config.ts`.
+
+## 🚀 Deployment
+
+### Docker Deployment
+
+The application is containerized using Docker with a multi-stage build:
+
+1. **Build the Docker image**
+   ```bash
+   docker build -t fake-out-game .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run -p 80:80 fake-out-game
+   ```
+
+3. **Access the application**
+   - Go to `http://localhost`
+   - The app will be served with nginx on port 80
+
+### Fly.io Deployment
+
+The application is deployed on Fly.io for production:
+
+1. **Install Fly CLI**
+   ```bash
+   curl -L https://fly.io/install.sh | sh
+   ```
+
+2. **Deploy to Fly.io**
+   ```bash
+   fly deploy
+   ```
+
+3. **Access the live application**
+   - Visit: `https://fakeout.fly.dev`
+   - The app runs on Fly.io's global network
+
 ### Production Architecture
 
 - **Frontend**: Built with Vite and served by nginx
