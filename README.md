@@ -124,12 +124,6 @@ Play the game right now: https://fakeout.fly.dev/
 - **ESLint** for code quality
 - **Modern React patterns** with hooks and functional components
 
-### Key Components
-- `HostApp.tsx` - Host interface and game management
-- `PlayerApp.tsx` - Player interface and gameplay
-- `App.tsx` - Mode selection and routing
-- `server.ts` - Backend game logic and Socket.IO handlers
-
 ## 📁 Project Structure
 
 ```
