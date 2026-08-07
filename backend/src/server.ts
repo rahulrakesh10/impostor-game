@@ -1,7 +1,7 @@
 // backend/src/server.ts
 import express from 'express';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,6 +32,13 @@ interface Room {
     answers: Map<string, string>;
     votes: Map<string, string>;
   };
+  lastRoundResult?: {
+    impostorId: string;
+    impostorCaught: boolean;
+    votes: Array<[string, string]>;
+    scores: Array<{ userId: string; displayName: string; score: number }>;
+  };
+  phaseEndsAt?: number;
   scores: Map<string, number>;
 }
 
@@ -160,6 +167,10 @@ const SAMPLE_QUESTIONS: Question[] = [
 // In-memory storage (replace with Redis in production)
 const rooms = new Map<string, Room>();
 const userSockets = new Map<string, string>(); // userId -> socketId
+const disconnectTimeouts = new Map<string, NodeJS.Timeout>(); // userId -> pending removal timeout
+
+// How long a disconnected player has to reconnect (e.g. phone screen lock) before being removed
+const RECONNECT_GRACE_MS = 30000;
 
 const app = express();
 const server = createServer(app);
@@ -251,32 +262,66 @@ io.on('connection', (socket) => {
   socket.on('room:join', (data) => {
     const { pin, userId, displayName } = data;
     const room = rooms.get(pin);
+
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+
+    // Reconnecting player (e.g. phone screen locked and dropped the socket)
+    if (room.players.has(userId)) {
+      reconnectPlayer(room, userId, socket);
+      return;
+    }
+
+    if (room.state !== 'lobby') {
+      socket.emit('error', { message: 'Game already in progress' });
+      return;
+    }
+
+    const user: User = { id: userId, displayName, socketId: socket.id };
+    room.players.set(userId, user);
+    room.scores.set(userId, 0);
+    userSockets.set(userId, socket.id);
+
+    socket.join(pin);
+
+    // Broadcast updated player list
+    const players = Array.from(room.players.values()).map(p => ({
+      id: p.id,
+      displayName: p.displayName
+    }));
+
+    io.to(pin).emit('room:update', { players, state: room.state });
+    socket.emit('room:joined', { roomId: room.id, pin });
+  });
+
+  socket.on('room:host-join', (data) => {
+    const { pin, userId, displayName } = data;
+    const room = rooms.get(pin);
     
     if (!room) {
       socket.emit('error', { message: 'Room not found' });
       return;
     }
     
-    if (room.state !== 'lobby') {
-      socket.emit('error', { message: 'Game already in progress' });
-      return;
-    }
-    
-    const user: User = { id: userId, displayName, socketId: socket.id };
-    room.players.set(userId, user);
-    room.scores.set(userId, 0);
+    // Host doesn't join as a player - they just connect to manage the room
     userSockets.set(userId, socket.id);
-    
     socket.join(pin);
-    
-    // Broadcast updated player list
+
+    // Send current room state to host
     const players = Array.from(room.players.values()).map(p => ({
       id: p.id,
       displayName: p.displayName
     }));
-    
-    io.to(pin).emit('room:update', { players, state: room.state });
+
     socket.emit('room:joined', { roomId: room.id, pin });
+    socket.emit('room:update', { players, state: room.state });
+
+    // If the host is reconnecting mid-game, restore full state (no per-user question)
+    if (room.state !== 'lobby') {
+      socket.emit('room:sync', buildSyncPayload(room));
+    }
   });
 
   socket.on('game:start', (data) => {
@@ -350,26 +395,31 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    // Handle player disconnect - remove from rooms
-    for (const [socketId, userId] of userSockets.entries()) {
-      if (socketId === socket.id) {
-        userSockets.delete(socketId);
-        // Remove from all rooms
-        for (const room of rooms.values()) {
-          if (room.players.has(userId)) {
-            room.players.delete(userId);
-            room.scores.delete(userId);
-            // Broadcast updated player list
-            const players = Array.from(room.players.values()).map(p => ({
-              id: p.id,
-              displayName: p.displayName
-            }));
-            io.to(room.pin).emit('room:update', { players, state: room.state });
-          }
+    const userId = getUserIdFromSocket(socket.id);
+    if (!userId) return;
+
+    // Don't remove immediately - give them a grace period to reconnect
+    // (e.g. phone screen locks and the socket drops, but the player is still "in" the game)
+    const timeout = setTimeout(() => {
+      disconnectTimeouts.delete(userId);
+      // Only remove if they never reconnected (socket mapping still points at the dead socket)
+      if (userSockets.get(userId) !== socket.id) return;
+
+      userSockets.delete(userId);
+      for (const room of rooms.values()) {
+        if (room.players.has(userId)) {
+          room.players.delete(userId);
+          room.scores.delete(userId);
+          const players = Array.from(room.players.values()).map(p => ({
+            id: p.id,
+            displayName: p.displayName
+          }));
+          io.to(room.pin).emit('room:update', { players, state: room.state });
         }
-        break;
       }
-    }
+    }, RECONNECT_GRACE_MS);
+
+    disconnectTimeouts.set(userId, timeout);
   });
 });
 
@@ -378,6 +428,72 @@ function getUserIdFromSocket(socketId: string): string | undefined {
     if (sId === socketId) return userId;
   }
   return undefined;
+}
+
+function getTimeLeft(room: Room): number {
+  if (!room.phaseEndsAt) return 0;
+  return Math.max(0, Math.round((room.phaseEndsAt - Date.now()) / 1000));
+}
+
+// Builds the state a (re)connecting client needs to resume mid-game, optionally
+// personalized for a specific player (their question, whether they've already answered/voted)
+function buildSyncPayload(room: Room, userId?: string) {
+  const players = Array.from(room.players.values()).map(p => ({
+    id: p.id,
+    displayName: p.displayName
+  }));
+  const scores = Array.from(room.scores.entries()).map(([id, score]) => ({
+    userId: id,
+    displayName: room.players.get(id)?.displayName || 'Unknown',
+    score
+  }));
+
+  const payload: any = {
+    state: room.state,
+    round: room.currentRound,
+    timeLeft: getTimeLeft(room),
+    players,
+    scores
+  };
+
+  if (room.currentRoundData && userId) {
+    const isImpostor = userId === room.currentRoundData.impostorId;
+    payload.question = isImpostor ? room.currentRoundData.impostorQuestion : room.currentRoundData.groupQuestion;
+    payload.isImpostor = isImpostor;
+    payload.hasAnswered = room.currentRoundData.answers.has(userId);
+    payload.hasVoted = room.currentRoundData.votes.has(userId);
+  }
+
+  if (room.state === 'results' && room.lastRoundResult) {
+    payload.lastResult = {
+      impostorId: room.lastRoundResult.impostorId,
+      impostorCaught: room.lastRoundResult.impostorCaught
+    };
+  }
+
+  return payload;
+}
+
+function reconnectPlayer(room: Room, userId: string, socket: Socket) {
+  const existingTimeout = disconnectTimeouts.get(userId);
+  if (existingTimeout) {
+    clearTimeout(existingTimeout);
+    disconnectTimeouts.delete(userId);
+  }
+
+  const user = room.players.get(userId)!;
+  user.socketId = socket.id;
+  userSockets.set(userId, socket.id);
+  socket.join(room.pin);
+
+  const players = Array.from(room.players.values()).map(p => ({
+    id: p.id,
+    displayName: p.displayName
+  }));
+
+  socket.emit('room:joined', { roomId: room.id, pin: room.pin });
+  socket.emit('room:update', { players, state: room.state });
+  socket.emit('room:sync', buildSyncPayload(room, userId));
 }
 
 function startRound(room: Room) {
@@ -396,6 +512,8 @@ function startRound(room: Room) {
     votes: new Map()
   };
   
+  room.phaseEndsAt = Date.now() + room.settings.answerTimer * 1000;
+
   // Send round start to all players
   io.to(room.pin).emit('round:start', {
     roundNumber: room.currentRound,
@@ -429,7 +547,8 @@ function startRound(room: Room) {
 
 function startDiscussion(room: Room) {
   room.state = 'discussing';
-  
+  room.phaseEndsAt = Date.now() + room.settings.discussionTimer * 1000;
+
   io.to(room.pin).emit('discussion:start', {
     timer: room.settings.discussionTimer
   });
@@ -444,12 +563,13 @@ function startDiscussion(room: Room) {
 
 function startVoting(room: Room) {
   room.state = 'voting';
-  
+  room.phaseEndsAt = Date.now() + room.settings.voteTimer * 1000;
+
   const players = Array.from(room.players.values()).map(p => ({
     id: p.id,
     displayName: p.displayName
   }));
-  
+
   io.to(room.pin).emit('voting:start', {
     timer: room.settings.voteTimer,
     players
@@ -506,14 +626,22 @@ function calculateResults(room: Room) {
     displayName: room.players.get(userId)?.displayName || 'Unknown',
     score
   }));
-  
+
+  room.lastRoundResult = {
+    impostorId,
+    impostorCaught,
+    votes: Array.from(votes.entries()),
+    scores
+  };
+  room.phaseEndsAt = Date.now() + 5000;
+
   io.to(room.pin).emit('round:result', {
     impostorId,
     impostorCaught,
     votes: Array.from(votes.entries()),
     scores
   });
-  
+
   // Check if game should end
   setTimeout(() => {
     if (room.currentRound >= room.settings.rounds) {
