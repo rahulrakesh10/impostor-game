@@ -23,6 +23,7 @@ interface Room {
     discussionTimer: number;
     voteTimer: number;
     showQuestionDuringDiscussion: boolean;
+    revealImpostorRole: boolean;
   };
   state: 'lobby' | 'answering' | 'discussing' | 'voting' | 'results' | 'ended';
   currentRound: number;
@@ -229,7 +230,8 @@ app.post('/api/rooms', (req, res) => {
       answerTimer: 30,
       discussionTimer: 120,
       voteTimer: 15,
-      showQuestionDuringDiscussion: true
+      showQuestionDuringDiscussion: true,
+      revealImpostorRole: true
     },
     state: 'lobby',
     currentRound: 0,
@@ -338,7 +340,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:start', (data) => {
-    const { pin, showQuestionDuringDiscussion } = data;
+    const { pin, showQuestionDuringDiscussion, revealImpostorRole } = data;
     const room = rooms.get(pin);
 
     if (!room || room.state !== 'lobby') {
@@ -354,6 +356,9 @@ io.on('connection', (socket) => {
 
     if (typeof showQuestionDuringDiscussion === 'boolean') {
       room.settings.showQuestionDuringDiscussion = showQuestionDuringDiscussion;
+    }
+    if (typeof revealImpostorRole === 'boolean') {
+      room.settings.revealImpostorRole = revealImpostorRole;
     }
 
     // Start first round
@@ -559,7 +564,7 @@ function buildSyncPayload(room: Room, userId?: string) {
       if (room.state !== 'discussing') {
         payload.question = isImpostor ? room.currentRoundData.impostorQuestion : room.currentRoundData.groupQuestion;
       }
-      payload.isImpostor = isImpostor;
+      payload.isImpostor = isImpostor && room.settings.revealImpostorRole;
       payload.hasAnswered = room.currentRoundData.answers.has(userId);
       payload.hasVoted = room.currentRoundData.votes.has(userId);
     }
@@ -628,9 +633,10 @@ function startRound(room: Room) {
     
     const isImpostor = playerId === impostorId;
     const question = isImpostor ? impostor.text : group.text;
-    
+
     io.to(user.socketId).emit(isImpostor ? 'prompt:impostor' : 'prompt:group', {
       text: question,
+      revealed: room.settings.revealImpostorRole,
       players: Array.from(room.players.values()).map(p => ({
         id: p.id,
         displayName: p.displayName

@@ -180,7 +180,7 @@ function PlayerApp() {
       setGameState(prev => ({
         ...prev,
         currentQuestion: data.text,
-        isImpostor: true
+        isImpostor: !!data.revealed
       }));
     });
 

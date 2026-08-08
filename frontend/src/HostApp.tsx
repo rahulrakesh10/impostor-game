@@ -180,7 +180,7 @@ function HostApp() {
       setGameState(prev => ({
         ...prev,
         currentQuestion: data.text,
-        isImpostor: true
+        isImpostor: !!data.revealed
       }));
     });
 
@@ -275,10 +275,10 @@ function HostApp() {
     }
   };
 
-  const startGame = (showQuestionDuringDiscussion: boolean) => {
+  const startGame = (showQuestionDuringDiscussion: boolean, revealImpostorRole: boolean) => {
     soundManager.playClick();
     if (gameState.room) {
-      socket?.emit('game:start', { pin: gameState.room.pin, showQuestionDuringDiscussion });
+      socket?.emit('game:start', { pin: gameState.room.pin, showQuestionDuringDiscussion, revealImpostorRole });
     }
   };
 
@@ -412,13 +412,14 @@ function HostLobbyScreen({
 }: {
   room: { pin: string; players: Player[] };
   user: { isHost: boolean };
-  onStartGame: (showQuestionDuringDiscussion: boolean) => void;
+  onStartGame: (showQuestionDuringDiscussion: boolean, revealImpostorRole: boolean) => void;
   onKickPlayer: (playerId: string, displayName: string) => void;
   gameState: GameState;
 }) {
   const [showBriefing, setShowBriefing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showQuestionDuringDiscussion, setShowQuestionDuringDiscussion] = useState(true);
+  const [revealImpostorRole, setRevealImpostorRole] = useState(true);
 
   const copyPin = async () => {
     soundManager.playClick();
@@ -480,8 +481,17 @@ function HostLobbyScreen({
           Show the question on screen during discussion
         </label>
 
+        <label className="setting-toggle">
+          <input
+            type="checkbox"
+            checked={revealImpostorRole}
+            onChange={(e) => setRevealImpostorRole(e.target.checked)}
+          />
+          Tell the impostor they're the impostor
+        </label>
+
         <button
-          onClick={() => onStartGame(showQuestionDuringDiscussion)}
+          onClick={() => onStartGame(showQuestionDuringDiscussion, revealImpostorRole)}
           className="button primary"
           disabled={room.players.length < 3}
         >
