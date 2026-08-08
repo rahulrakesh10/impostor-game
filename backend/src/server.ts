@@ -172,11 +172,16 @@ const disconnectTimeouts = new Map<string, NodeJS.Timeout>(); // userId -> pendi
 // How long a disconnected player has to reconnect (e.g. phone screen lock) before being removed
 const RECONNECT_GRACE_MS = 30000;
 
+// Hard cap on players per room
+const MAX_PLAYERS = 10;
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Frontend URL
+    origin: process.env.NODE_ENV === 'production'
+      ? ["https://fakeout.fly.dev"]
+      : "http://localhost:5173",
     methods: ["GET", "POST"]
   }
 });
@@ -276,6 +281,11 @@ io.on('connection', (socket) => {
 
     if (room.state !== 'lobby') {
       socket.emit('error', { message: 'Game already in progress' });
+      return;
+    }
+
+    if (room.players.size >= MAX_PLAYERS) {
+      socket.emit('error', { message: `Room is full (max ${MAX_PLAYERS} players)` });
       return;
     }
 
@@ -391,6 +401,53 @@ io.on('connection', (socket) => {
     if (room.currentRoundData.votes.size === room.players.size) {
       calculateResults(room);
     }
+  });
+
+  socket.on('player:kick', (data) => {
+    const { pin, targetUserId } = data;
+    const room = rooms.get(pin);
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+
+    const requesterUserId = getUserIdFromSocket(socket.id);
+    if (requesterUserId !== room.hostUserId) {
+      socket.emit('error', { message: 'Only the host can kick players' });
+      return;
+    }
+
+    const targetPlayer = room.players.get(targetUserId);
+    if (!targetPlayer) {
+      socket.emit('error', { message: 'Player not found' });
+      return;
+    }
+
+    const pendingTimeout = disconnectTimeouts.get(targetUserId);
+    if (pendingTimeout) {
+      clearTimeout(pendingTimeout);
+      disconnectTimeouts.delete(targetUserId);
+    }
+
+    room.players.delete(targetUserId);
+    room.scores.delete(targetUserId);
+    if (room.currentRoundData) {
+      room.currentRoundData.answers.delete(targetUserId);
+      room.currentRoundData.votes.delete(targetUserId);
+    }
+
+    const targetSocket = io.sockets.sockets.get(targetPlayer.socketId);
+    if (targetSocket) {
+      targetSocket.emit('player:kicked', { message: 'You have been kicked from the game by the host' });
+      targetSocket.leave(room.pin);
+    }
+    userSockets.delete(targetUserId);
+
+    const players = Array.from(room.players.values()).map(p => ({
+      id: p.id,
+      displayName: p.displayName
+    }));
+    io.to(room.pin).emit('room:update', { players, state: room.state });
   });
 
   socket.on('disconnect', () => {

@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { HowToPlayButton, HowToPlayModal } from './HowToPlay';
 import { QrJoinPanel } from './QrJoinPanel';
+import { ErrorToast } from './ErrorToast';
+import { SoundToggle } from './SoundToggle';
+import { soundManager, useTimerSound } from './sounds';
 
 interface Player {
   id: string;
@@ -34,7 +37,7 @@ interface GameState {
   };
 }
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin;
 const SESSION_KEY = 'impostor_host_session';
 
 interface StoredSession {
@@ -71,6 +74,13 @@ function HostApp() {
     answerId: string;
     answerName: string;
   }>>([]);
+
+  // Auto-dismiss error toasts
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -132,6 +142,8 @@ function HostApp() {
     });
 
     newSocket.on('round:start', (data) => {
+      soundManager.resetTimerSoundTracking();
+      soundManager.playRoundStart();
       setGameState(prev => ({
         ...prev,
         state: 'answering',
@@ -180,6 +192,11 @@ function HostApp() {
     });
 
     newSocket.on('round:result', (data) => {
+      if (data.impostorCaught) {
+        soundManager.playSuccess();
+      } else {
+        soundManager.playFailure();
+      }
       setGameState(prev => ({
         ...prev,
         state: 'results',
@@ -214,6 +231,7 @@ function HostApp() {
   }, []);
 
   const createRoom = async () => {
+    soundManager.playClick();
     const userId = Math.random().toString(36).substring(7);
     const displayName = 'Host';
     
@@ -242,59 +260,63 @@ function HostApp() {
   };
 
   const startGame = () => {
+    soundManager.playClick();
     if (gameState.room) {
       socket?.emit('game:start', { pin: gameState.room.pin });
     }
   };
 
-  if (gameState.state === 'landing') {
-    return <HostLandingScreen onCreateRoom={createRoom} />;
-  }
+  const kickPlayer = (playerId: string, displayName: string) => {
+    soundManager.playClick();
+    if (!gameState.room) return;
+    if (!window.confirm(`Dismiss ${displayName} from the case?`)) return;
+    socket?.emit('player:kick', { pin: gameState.room.pin, targetUserId: playerId });
+  };
 
-  if (gameState.state === 'lobby') {
-    return (
-      <HostLobbyScreen 
+  let screen: React.ReactNode;
+
+  if (gameState.state === 'landing') {
+    screen = <HostLandingScreen onCreateRoom={createRoom} />;
+  } else if (gameState.state === 'lobby') {
+    screen = (
+      <HostLobbyScreen
         room={gameState.room!}
         user={gameState.user!}
         onStartGame={startGame}
+        onKickPlayer={kickPlayer}
         gameState={gameState}
       />
     );
-  }
-
-  if (gameState.state === 'answering') {
-    return (
+  } else if (gameState.state === 'answering') {
+    screen = (
       <HostAnswerScreen
         question={gameState.currentQuestion!}
         players={gameState.room!.players}
         timer={countdown}
         isImpostor={gameState.isImpostor!}
         playerAnswers={playerAnswers}
+        onKickPlayer={kickPlayer}
       />
     );
-  }
-
-  if (gameState.state === 'discussing') {
-    return (
+  } else if (gameState.state === 'discussing') {
+    screen = (
       <HostDiscussionScreen
         players={gameState.room!.players}
         timer={countdown}
         playerAnswers={playerAnswers}
+        onKickPlayer={kickPlayer}
       />
     );
-  }
-
-  if (gameState.state === 'voting') {
-    return (
+  } else if (gameState.state === 'voting') {
+    screen = (
       <HostVotingScreen
         players={gameState.room!.players}
         timer={countdown}
+        onKickPlayer={kickPlayer}
       />
     );
-  }
-
-  if (gameState.state === 'results') {
-    return (
+  } else if (gameState.state === 'results') {
+    screen = (
       <HostResultsScreen
         scores={gameState.scores!}
         lastResult={gameState.lastResult!}
@@ -302,17 +324,22 @@ function HostApp() {
         timer={countdown}
       />
     );
-  }
-
-  if (gameState.state === 'ended') {
-    return (
+  } else if (gameState.state === 'ended') {
+    screen = (
       <HostGameEndScreen
         finalScores={gameState.scores!}
       />
     );
+  } else {
+    screen = <div>Loading...</div>;
   }
 
-  return <div>Loading...</div>;
+  return (
+    <>
+      {error && <ErrorToast message={error} onDismiss={() => setError('')} />}
+      {screen}
+    </>
+  );
 }
 
 // Host-specific components
@@ -337,6 +364,7 @@ function HostLandingScreen({ onCreateRoom }: { onCreateRoom: () => void }) {
           </button>
           <div className="lobby-actions">
             <HowToPlayButton onClick={() => setShowBriefing(true)} />
+            <SoundToggle />
           </div>
         </div>
       </div>
@@ -350,17 +378,20 @@ function HostLobbyScreen({
   room,
   user,
   onStartGame,
+  onKickPlayer,
   gameState
 }: {
   room: { pin: string; players: Player[] };
   user: { isHost: boolean };
   onStartGame: () => void;
+  onKickPlayer: (playerId: string, displayName: string) => void;
   gameState: GameState;
 }) {
   const [showBriefing, setShowBriefing] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const copyPin = async () => {
+    soundManager.playClick();
     try {
       await navigator.clipboard.writeText(room.pin);
       setCopied(true);
@@ -375,6 +406,7 @@ function HostLobbyScreen({
       <div className="container">
         <div className="lobby-actions">
           <HowToPlayButton onClick={() => setShowBriefing(true)} />
+          <SoundToggle />
         </div>
 
         <h2>Waiting Room</h2>
@@ -396,7 +428,15 @@ function HostLobbyScreen({
           <h3>Suspects ({room.players.length})</h3>
           {room.players.map(player => (
             <div key={player.id} className="player-card">
-              {player.displayName}
+              <span>{player.displayName}</span>
+              <button
+                className="kick-button"
+                onClick={() => onKickPlayer(player.id, player.displayName)}
+                title={`Dismiss ${player.displayName}`}
+                type="button"
+              >
+                Dismiss
+              </button>
             </div>
           ))}
         </div>
@@ -420,7 +460,8 @@ function HostAnswerScreen({
   players,
   timer,
   isImpostor,
-  playerAnswers
+  playerAnswers,
+  onKickPlayer
 }: {
   question: string;
   players: Player[];
@@ -432,11 +473,14 @@ function HostAnswerScreen({
     answerId: string;
     answerName: string;
   }>;
+  onKickPlayer: (playerId: string, displayName: string) => void;
 }) {
+  useTimerSound(timer);
+
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="big-timer">
+        <div className={`big-timer ${timer <= 3 ? 'urgent' : ''}`}>
           <div className="timer-display">{timer}</div>
           <div className="timer-label">SECONDS TO ANSWER</div>
         </div>
@@ -470,6 +514,14 @@ function HostAnswerScreen({
                       <span className="waiting-status">Pending</span>
                     )}
                   </div>
+                  <button
+                    className="kick-button"
+                    onClick={() => onKickPlayer(player.id, player.displayName)}
+                    title={`Dismiss ${player.displayName}`}
+                    type="button"
+                  >
+                    Dismiss
+                  </button>
                 </div>
               );
             })}
@@ -483,7 +535,8 @@ function HostAnswerScreen({
 function HostDiscussionScreen({
   players,
   timer,
-  playerAnswers
+  playerAnswers,
+  onKickPlayer
 }: {
   players: Player[];
   timer: number;
@@ -493,11 +546,14 @@ function HostDiscussionScreen({
     answerId: string;
     answerName: string;
   }>;
+  onKickPlayer: (playerId: string, displayName: string) => void;
 }) {
+  useTimerSound(timer);
+
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="big-timer discussion-timer">
+        <div className={`big-timer discussion-timer ${timer <= 3 ? 'urgent' : ''}`}>
           <div className="timer-display">{timer}</div>
           <div className="timer-label">SECONDS TO DISCUSS</div>
         </div>
@@ -535,6 +591,14 @@ function HostDiscussionScreen({
                 <div className="player-avatar">{player.displayName.charAt(0).toUpperCase()}</div>
                 <span>{player.displayName}</span>
                 <div className="status-indicator waiting-status">In discussion</div>
+                <button
+                  className="kick-button"
+                  onClick={() => onKickPlayer(player.id, player.displayName)}
+                  title={`Dismiss ${player.displayName}`}
+                  type="button"
+                >
+                  Dismiss
+                </button>
               </div>
             ))}
           </div>
@@ -546,15 +610,19 @@ function HostDiscussionScreen({
 
 function HostVotingScreen({
   players,
-  timer
+  timer,
+  onKickPlayer
 }: {
   players: Player[];
   timer: number;
+  onKickPlayer: (playerId: string, displayName: string) => void;
 }) {
+  useTimerSound(timer);
+
   return (
     <div className="screen">
       <div className="container host-container">
-        <div className="big-timer voting-timer">
+        <div className={`big-timer voting-timer ${timer <= 3 ? 'urgent' : ''}`}>
           <div className="timer-display">{timer}</div>
           <div className="timer-label">SECONDS TO VOTE</div>
         </div>
@@ -579,6 +647,14 @@ function HostVotingScreen({
                 <div className="player-avatar">{player.displayName.charAt(0).toUpperCase()}</div>
                 <span>{player.displayName}</span>
                 <div className="status-indicator waiting-status">Voting</div>
+                <button
+                  className="kick-button"
+                  onClick={() => onKickPlayer(player.id, player.displayName)}
+                  title={`Dismiss ${player.displayName}`}
+                  type="button"
+                >
+                  Dismiss
+                </button>
               </div>
             ))}
           </div>

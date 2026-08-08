@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts"],"version":"5.8.3"}
+{"root":["./src/app.tsx","./src/errortoast.tsx","./src/hostapp.tsx","./src/howtoplay.tsx","./src/playerapp.tsx","./src/qrjoinpanel.tsx","./src/soundtoggle.tsx","./src/main.tsx","./src/sounds.ts","./src/vite-env.d.ts"],"version":"5.8.3"}

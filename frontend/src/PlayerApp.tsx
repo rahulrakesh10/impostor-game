@@ -2,6 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { HowToPlayButton, HowToPlayModal } from './HowToPlay';
+import { ErrorToast } from './ErrorToast';
+import { SoundToggle } from './SoundToggle';
+import { soundManager, useTimerSound } from './sounds';
 
 interface Player {
   id: string;
@@ -33,7 +36,7 @@ interface GameState {
   };
 }
 
-const SOCKET_URL = 'http://localhost:3001';
+const SOCKET_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin;
 const SESSION_KEY = 'impostor_player_session';
 
 interface StoredSession {
@@ -65,6 +68,13 @@ function PlayerApp() {
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(0);
+
+  // Auto-dismiss error toasts
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // Countdown timer effect
   useEffect(() => {
@@ -131,6 +141,8 @@ function PlayerApp() {
     });
 
     newSocket.on('round:start', (data) => {
+      soundManager.resetTimerSoundTracking();
+      soundManager.playRoundStart();
       setGameState(prev => ({
         ...prev,
         state: 'answering',
@@ -176,6 +188,11 @@ function PlayerApp() {
     });
 
     newSocket.on('round:result', (data) => {
+      if (data.impostorCaught) {
+        soundManager.playSuccess();
+      } else {
+        soundManager.playFailure();
+      }
       setGameState(prev => ({
         ...prev,
         state: 'results',
@@ -205,12 +222,19 @@ function PlayerApp() {
       }
     });
 
+    newSocket.on('player:kicked', (data) => {
+      clearSession();
+      setError(data.message || 'You were dismissed from the case by the host');
+      setGameState({ state: 'landing' });
+    });
+
     return () => {
       newSocket.disconnect();
     };
   }, []);
 
   const joinRoom = (pin: string, displayName: string) => {
+    soundManager.playClick();
     const userId = Math.random().toString(36).substring(7);
 
     saveSession({ userId, displayName, pin });
@@ -226,39 +250,37 @@ function PlayerApp() {
 
   const submitAnswer = () => {
     if (selectedAnswer && gameState.room) {
-      console.log('Submitting answer:', selectedAnswer);
-      socket?.emit('answer:submit', { 
-        pin: gameState.room.pin, 
-        targetUserId: selectedAnswer 
+      soundManager.playSubmit();
+      socket?.emit('answer:submit', {
+        pin: gameState.room.pin,
+        targetUserId: selectedAnswer
       });
     }
   };
 
   const submitVote = () => {
     if (selectedAnswer && gameState.room) {
-      console.log('Submitting vote:', selectedAnswer);
-      socket?.emit('vote:submit', { 
-        pin: gameState.room.pin, 
-        targetUserId: selectedAnswer 
+      soundManager.playSubmit();
+      socket?.emit('vote:submit', {
+        pin: gameState.room.pin,
+        targetUserId: selectedAnswer
       });
     }
   };
 
-  if (gameState.state === 'landing') {
-    return <PlayerLandingScreen onJoinRoom={joinRoom} />;
-  }
+  let screen: React.ReactNode;
 
-  if (gameState.state === 'lobby') {
-    return (
-      <PlayerLobbyScreen 
+  if (gameState.state === 'landing') {
+    screen = <PlayerLandingScreen onJoinRoom={joinRoom} />;
+  } else if (gameState.state === 'lobby') {
+    screen = (
+      <PlayerLobbyScreen
         room={gameState.room!}
         user={gameState.user!}
       />
     );
-  }
-
-  if (gameState.state === 'answering') {
-    return (
+  } else if (gameState.state === 'answering') {
+    screen = (
       <PlayerAnswerScreen
         question={gameState.currentQuestion!}
         isImpostor={gameState.isImpostor!}
@@ -269,18 +291,14 @@ function PlayerApp() {
         timer={countdown}
       />
     );
-  }
-
-  if (gameState.state === 'discussing') {
-    return (
+  } else if (gameState.state === 'discussing') {
+    screen = (
       <PlayerDiscussionScreen
         timer={countdown}
       />
     );
-  }
-
-  if (gameState.state === 'voting') {
-    return (
+  } else if (gameState.state === 'voting') {
+    screen = (
       <PlayerVotingScreen
         players={gameState.room!.players}
         selectedVote={selectedAnswer}
@@ -289,10 +307,8 @@ function PlayerApp() {
         timer={countdown}
       />
     );
-  }
-
-  if (gameState.state === 'results') {
-    return (
+  } else if (gameState.state === 'results') {
+    screen = (
       <PlayerResultsScreen
         scores={gameState.scores!}
         lastResult={gameState.lastResult!}
@@ -300,17 +316,22 @@ function PlayerApp() {
         timer={countdown}
       />
     );
-  }
-
-  if (gameState.state === 'ended') {
-    return (
+  } else if (gameState.state === 'ended') {
+    screen = (
       <PlayerGameEndScreen
         finalScores={gameState.scores!}
       />
     );
+  } else {
+    screen = <div>Loading...</div>;
   }
 
-  return <div>Loading...</div>;
+  return (
+    <>
+      {error && <ErrorToast message={error} onDismiss={() => setError('')} />}
+      {screen}
+    </>
+  );
 }
 
 // Player-specific components
@@ -367,6 +388,7 @@ function PlayerLandingScreen({ onJoinRoom }: { onJoinRoom: (pin: string, name: s
 
           <div className="lobby-actions">
             <HowToPlayButton onClick={() => setShowBriefing(true)} />
+            <SoundToggle />
           </div>
         </div>
       </div>
@@ -421,10 +443,14 @@ function PlayerAnswerScreen({
   onSubmitAnswer: () => void;
   timer?: number;
 }) {
+  useTimerSound(timer);
+
   return (
     <div className="screen">
       <div className="container">
-        {timer !== undefined && <div className="timer">{timer}s</div>}
+        {timer !== undefined && (
+          <div className={`timer ${timer <= 3 ? 'urgent' : ''}`}>{timer}s</div>
+        )}
 
         <div className={`question-container ${isImpostor ? 'impostor' : 'group'}`}>
           <h2>{question}</h2>
@@ -483,10 +509,14 @@ function PlayerVotingScreen({
   onSubmitVote: () => void;
   timer?: number;
 }) {
+  useTimerSound(timer);
+
   return (
     <div className="screen">
       <div className="container">
-        {timer !== undefined && <div className="timer">{timer}s</div>}
+        {timer !== undefined && (
+          <div className={`timer ${timer <= 3 ? 'urgent' : ''}`}>{timer}s</div>
+        )}
 
         <h2>Cast Your Accusation</h2>
 
