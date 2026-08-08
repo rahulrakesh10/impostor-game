@@ -64,6 +64,7 @@ function clearSession() {
 
 function PlayerApp() {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const [gameState, setGameState] = useState<GameState>({ state: 'landing' });
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -87,12 +88,17 @@ function PlayerApp() {
   }, [countdown]);
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL);
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
     setSocket(newSocket);
 
     // Rejoin automatically on every connect - both the first connect and any
     // reconnect after the socket drops (e.g. phone screen locks, wifi blip)
     newSocket.on('connect', () => {
+      setSocketConnected(true);
       const session = loadSession();
       if (session) {
         setGameState(prev => ({
@@ -106,6 +112,14 @@ function PlayerApp() {
           displayName: session.displayName
         });
       }
+    });
+
+    newSocket.on('connect_error', () => {
+      setSocketConnected(false);
+    });
+
+    newSocket.on('disconnect', () => {
+      setSocketConnected(false);
     });
 
     // Socket event listeners
@@ -122,7 +136,9 @@ function PlayerApp() {
         ...prev,
         state: data.state,
         room: { ...prev.room!, players: data.players },
-        currentQuestion: data.question ?? prev.currentQuestion,
+        // During discussion the question is only sent when the host chose to show it -
+        // don't fall back to a stale value from the answering phase (could be the impostor's).
+        currentQuestion: data.state === 'discussing' ? data.question : (data.question ?? prev.currentQuestion),
         isImpostor: data.isImpostor ?? prev.isImpostor,
         scores: data.scores ?? prev.scores,
         lastResult: data.lastResult ?? prev.lastResult
@@ -172,7 +188,8 @@ function PlayerApp() {
       setGameState(prev => ({
         ...prev,
         state: 'discussing',
-        timer: data.timer
+        timer: data.timer,
+        currentQuestion: data.question
       }));
       setCountdown(data.timer);
     });
@@ -271,7 +288,7 @@ function PlayerApp() {
   let screen: React.ReactNode;
 
   if (gameState.state === 'landing') {
-    screen = <PlayerLandingScreen onJoinRoom={joinRoom} />;
+    screen = <PlayerLandingScreen onJoinRoom={joinRoom} socketConnected={socketConnected} />;
   } else if (gameState.state === 'lobby') {
     screen = (
       <PlayerLobbyScreen
@@ -295,6 +312,7 @@ function PlayerApp() {
     screen = (
       <PlayerDiscussionScreen
         timer={countdown}
+        question={gameState.currentQuestion}
       />
     );
   } else if (gameState.state === 'voting') {
@@ -328,6 +346,9 @@ function PlayerApp() {
 
   return (
     <>
+      {!socketConnected && gameState.state !== 'landing' && (
+        <div className="connection-banner">Reconnecting...</div>
+      )}
       {error && <ErrorToast message={error} onDismiss={() => setError('')} />}
       {screen}
     </>
@@ -335,7 +356,7 @@ function PlayerApp() {
 }
 
 // Player-specific components
-function PlayerLandingScreen({ onJoinRoom }: { onJoinRoom: (pin: string, name: string) => void }) {
+function PlayerLandingScreen({ onJoinRoom, socketConnected }: { onJoinRoom: (pin: string, name: string) => void; socketConnected: boolean }) {
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState(() => new URLSearchParams(window.location.search).get('pin') || '');
   const [showBriefing, setShowBriefing] = useState(false);
@@ -381,8 +402,8 @@ function PlayerLandingScreen({ onJoinRoom }: { onJoinRoom: (pin: string, name: s
               maxLength={6}
             />
 
-            <button type="submit" className="button primary">
-              Join Case
+            <button type="submit" className="button primary" disabled={!socketConnected}>
+              {socketConnected ? 'Join Case' : 'Connecting...'}
             </button>
           </form>
 
@@ -481,15 +502,23 @@ function PlayerAnswerScreen({
   );
 }
 
-function PlayerDiscussionScreen({ timer }: { timer?: number }) {
+function PlayerDiscussionScreen({ timer, question }: { timer?: number; question?: string }) {
   return (
     <div className="screen">
       <div className="container">
         {timer !== undefined && <div className="timer">{timer}s</div>}
         <h2>Cross-Examination</h2>
         <p>Compare statements out loud. Someone's story won't add up.</p>
+
+        {question && (
+          <div className="question-container group">
+            <h3>The question on file:</h3>
+            <p className="question-text">{question}</p>
+          </div>
+        )}
+
         <div className="discussion-hint">
-          Listen for the answer that doesn't quite fit the group's story.
+          Listen for the answer that doesn't quite fit the group's story. Ask your host to skip to voting once everyone's ready.
         </div>
       </div>
     </div>

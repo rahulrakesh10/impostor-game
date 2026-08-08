@@ -65,6 +65,7 @@ function clearSession() {
 
 function HostApp() {
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const [gameState, setGameState] = useState<GameState>({ state: 'landing' });
   const [error, setError] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(0);
@@ -93,12 +94,17 @@ function HostApp() {
   }, [countdown]);
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL);
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true
+    });
     setSocket(newSocket);
 
     // Rejoin automatically on every connect - both the first connect and any
     // reconnect after the socket drops (e.g. tab backgrounded, wifi blip)
     newSocket.on('connect', () => {
+      setSocketConnected(true);
       const session = loadSession();
       if (session) {
         setGameState(prev => ({
@@ -112,6 +118,14 @@ function HostApp() {
           displayName: session.displayName
         });
       }
+    });
+
+    newSocket.on('connect_error', () => {
+      setSocketConnected(false);
+    });
+
+    newSocket.on('disconnect', () => {
+      setSocketConnected(false);
     });
 
     // Socket event listeners
@@ -128,6 +142,7 @@ function HostApp() {
         ...prev,
         state: data.state,
         room: { ...prev.room!, players: data.players },
+        currentQuestion: data.question,
         scores: data.scores ?? prev.scores,
         lastResult: data.lastResult ?? prev.lastResult
       }));
@@ -177,7 +192,8 @@ function HostApp() {
       setGameState(prev => ({
         ...prev,
         state: 'discussing',
-        timer: data.timer
+        timer: data.timer,
+        currentQuestion: data.question
       }));
       setCountdown(data.timer);
     });
@@ -259,10 +275,17 @@ function HostApp() {
     }
   };
 
-  const startGame = () => {
+  const startGame = (showQuestionDuringDiscussion: boolean) => {
     soundManager.playClick();
     if (gameState.room) {
-      socket?.emit('game:start', { pin: gameState.room.pin });
+      socket?.emit('game:start', { pin: gameState.room.pin, showQuestionDuringDiscussion });
+    }
+  };
+
+  const skipToVoting = () => {
+    soundManager.playClick();
+    if (gameState.room) {
+      socket?.emit('discussion:skip-to-voting', { pin: gameState.room.pin });
     }
   };
 
@@ -276,7 +299,7 @@ function HostApp() {
   let screen: React.ReactNode;
 
   if (gameState.state === 'landing') {
-    screen = <HostLandingScreen onCreateRoom={createRoom} />;
+    screen = <HostLandingScreen onCreateRoom={createRoom} socketConnected={socketConnected} />;
   } else if (gameState.state === 'lobby') {
     screen = (
       <HostLobbyScreen
@@ -305,6 +328,8 @@ function HostApp() {
         timer={countdown}
         playerAnswers={playerAnswers}
         onKickPlayer={kickPlayer}
+        question={gameState.currentQuestion}
+        onSkipToVoting={skipToVoting}
       />
     );
   } else if (gameState.state === 'voting') {
@@ -336,6 +361,9 @@ function HostApp() {
 
   return (
     <>
+      {!socketConnected && gameState.state !== 'landing' && (
+        <div className="connection-banner">Reconnecting...</div>
+      )}
       {error && <ErrorToast message={error} onDismiss={() => setError('')} />}
       {screen}
     </>
@@ -343,7 +371,7 @@ function HostApp() {
 }
 
 // Host-specific components
-function HostLandingScreen({ onCreateRoom }: { onCreateRoom: () => void }) {
+function HostLandingScreen({ onCreateRoom, socketConnected }: { onCreateRoom: () => void; socketConnected: boolean }) {
   const [showBriefing, setShowBriefing] = useState(false);
 
   return (
@@ -359,8 +387,9 @@ function HostLandingScreen({ onCreateRoom }: { onCreateRoom: () => void }) {
           <button
             onClick={onCreateRoom}
             className="button primary"
+            disabled={!socketConnected}
           >
-            Open a New Case
+            {socketConnected ? 'Open a New Case' : 'Connecting...'}
           </button>
           <div className="lobby-actions">
             <HowToPlayButton onClick={() => setShowBriefing(true)} />
@@ -383,12 +412,13 @@ function HostLobbyScreen({
 }: {
   room: { pin: string; players: Player[] };
   user: { isHost: boolean };
-  onStartGame: () => void;
+  onStartGame: (showQuestionDuringDiscussion: boolean) => void;
   onKickPlayer: (playerId: string, displayName: string) => void;
   gameState: GameState;
 }) {
   const [showBriefing, setShowBriefing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showQuestionDuringDiscussion, setShowQuestionDuringDiscussion] = useState(true);
 
   const copyPin = async () => {
     soundManager.playClick();
@@ -441,8 +471,17 @@ function HostLobbyScreen({
           ))}
         </div>
 
+        <label className="setting-toggle">
+          <input
+            type="checkbox"
+            checked={showQuestionDuringDiscussion}
+            onChange={(e) => setShowQuestionDuringDiscussion(e.target.checked)}
+          />
+          Show the question on screen during discussion
+        </label>
+
         <button
-          onClick={onStartGame}
+          onClick={() => onStartGame(showQuestionDuringDiscussion)}
           className="button primary"
           disabled={room.players.length < 3}
         >
@@ -536,7 +575,9 @@ function HostDiscussionScreen({
   players,
   timer,
   playerAnswers,
-  onKickPlayer
+  onKickPlayer,
+  question,
+  onSkipToVoting
 }: {
   players: Player[];
   timer: number;
@@ -547,6 +588,8 @@ function HostDiscussionScreen({
     answerName: string;
   }>;
   onKickPlayer: (playerId: string, displayName: string) => void;
+  question?: string;
+  onSkipToVoting: () => void;
 }) {
   useTimerSound(timer);
 
@@ -557,7 +600,7 @@ function HostDiscussionScreen({
           <div className="timer-display">{timer}</div>
           <div className="timer-label">SECONDS TO DISCUSS</div>
         </div>
-        
+
         <div className="host-header">
           <h2>Cross-Examination</h2>
           <div className="phase-info">
@@ -565,9 +608,19 @@ function HostDiscussionScreen({
           </div>
         </div>
 
+        {question && (
+          <div className="question-container group">
+            <h3>The question on file:</h3>
+            <p className="question-text">{question}</p>
+          </div>
+        )}
+
         <div className="discussion-overview">
           <h3>Discussion in Progress</h3>
           <p>Suspects compare statements out loud, trying to spot who doesn't fit.</p>
+          <button className="button" onClick={onSkipToVoting} type="button">
+            Skip to Voting
+          </button>
         </div>
 
         <div className="answers-summary">

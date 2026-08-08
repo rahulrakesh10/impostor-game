@@ -526,6 +526,22 @@ body::before {
   text-transform: uppercase;
 }
 
+.setting-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--ink);
+  margin: 1rem 0;
+  cursor: pointer;
+}
+
+.setting-toggle input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+}
+
 .kick-button {
   flex-shrink: 0;
   background: none;
@@ -710,6 +726,22 @@ body::before {
   text-align: center;
   cursor: pointer;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
+}
+
+.connection-banner {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 1250;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 4px;
 }
 
 /* View override toggle (auto host/player detection escape hatch) */

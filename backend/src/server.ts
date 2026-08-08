@@ -22,6 +22,7 @@ interface Room {
     answerTimer: number;
     discussionTimer: number;
     voteTimer: number;
+    showQuestionDuringDiscussion: boolean;
   };
   state: 'lobby' | 'answering' | 'discussing' | 'voting' | 'results' | 'ended';
   currentRound: number;
@@ -32,6 +33,7 @@ interface Room {
     answers: Map<string, string>;
     votes: Map<string, string>;
   };
+  discussionTimeout?: NodeJS.Timeout;
   lastRoundResult?: {
     impostorId: string;
     impostorCaught: boolean;
@@ -226,7 +228,8 @@ app.post('/api/rooms', (req, res) => {
       rounds: 5,
       answerTimer: 30,
       discussionTimer: 120,
-      voteTimer: 15
+      voteTimer: 15,
+      showQuestionDuringDiscussion: true
     },
     state: 'lobby',
     currentRound: 0,
@@ -335,20 +338,24 @@ io.on('connection', (socket) => {
   });
 
   socket.on('game:start', (data) => {
-    const { pin } = data;
+    const { pin, showQuestionDuringDiscussion } = data;
     const room = rooms.get(pin);
-    
+
     if (!room || room.state !== 'lobby') {
       socket.emit('error', { message: 'Cannot start game' });
       return;
     }
-    
+
     const players = Array.from(room.players.keys());
     if (players.length < 3) {
       socket.emit('error', { message: 'Need at least 3 players to start' });
       return;
     }
-    
+
+    if (typeof showQuestionDuringDiscussion === 'boolean') {
+      room.settings.showQuestionDuringDiscussion = showQuestionDuringDiscussion;
+    }
+
     // Start first round
     startRound(room);
   });
@@ -401,6 +408,33 @@ io.on('connection', (socket) => {
     if (room.currentRoundData.votes.size === room.players.size) {
       calculateResults(room);
     }
+  });
+
+  socket.on('discussion:skip-to-voting', (data) => {
+    const { pin } = data;
+    const room = rooms.get(pin);
+    if (!room) {
+      socket.emit('error', { message: 'Room not found' });
+      return;
+    }
+
+    const requesterUserId = getUserIdFromSocket(socket.id);
+    if (requesterUserId !== room.hostUserId) {
+      socket.emit('error', { message: 'Only the host can skip to voting' });
+      return;
+    }
+
+    if (room.state !== 'discussing') {
+      socket.emit('error', { message: 'Not in discussion phase' });
+      return;
+    }
+
+    if (room.discussionTimeout) {
+      clearTimeout(room.discussionTimeout);
+      room.discussionTimeout = undefined;
+    }
+
+    startVoting(room);
   });
 
   socket.on('player:kick', (data) => {
@@ -513,12 +547,22 @@ function buildSyncPayload(room: Room, userId?: string) {
     scores
   };
 
-  if (room.currentRoundData && userId) {
-    const isImpostor = userId === room.currentRoundData.impostorId;
-    payload.question = isImpostor ? room.currentRoundData.impostorQuestion : room.currentRoundData.groupQuestion;
-    payload.isImpostor = isImpostor;
-    payload.hasAnswered = room.currentRoundData.answers.has(userId);
-    payload.hasVoted = room.currentRoundData.votes.has(userId);
+  if (room.currentRoundData) {
+    // Discussion question is the same for everyone (never the impostor's secret variant), so it
+    // doesn't need a userId - safe to include for the host too.
+    if (room.state === 'discussing' && room.settings.showQuestionDuringDiscussion) {
+      payload.question = room.currentRoundData.groupQuestion;
+    }
+
+    if (userId) {
+      const isImpostor = userId === room.currentRoundData.impostorId;
+      if (room.state !== 'discussing') {
+        payload.question = isImpostor ? room.currentRoundData.impostorQuestion : room.currentRoundData.groupQuestion;
+      }
+      payload.isImpostor = isImpostor;
+      payload.hasAnswered = room.currentRoundData.answers.has(userId);
+      payload.hasVoted = room.currentRoundData.votes.has(userId);
+    }
   }
 
   if (room.state === 'results' && room.lastRoundResult) {
@@ -607,11 +651,12 @@ function startDiscussion(room: Room) {
   room.phaseEndsAt = Date.now() + room.settings.discussionTimer * 1000;
 
   io.to(room.pin).emit('discussion:start', {
-    timer: room.settings.discussionTimer
+    timer: room.settings.discussionTimer,
+    question: room.settings.showQuestionDuringDiscussion ? room.currentRoundData?.groupQuestion : undefined
   });
-  
-  // Start timer for discussion phase
-  setTimeout(() => {
+
+  // Start timer for discussion phase (stored so the host can skip it early)
+  room.discussionTimeout = setTimeout(() => {
     if (room.state === 'discussing') {
       startVoting(room);
     }
