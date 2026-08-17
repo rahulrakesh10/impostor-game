@@ -17,7 +17,6 @@ A real-time multiplayer impostor game with host/player screens, built with React
 2. **Players**: Open on phones → Enter name + PIN → Join Game
 3. **Game Flow**: Answer → Discuss → Vote → Results → Repeat
 
-## Setup
 
 ### Backend
 ```bash
