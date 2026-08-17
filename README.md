@@ -18,13 +18,6 @@ A real-time multiplayer impostor game with host/player screens, built with React
 3. **Game Flow**: Answer → Discuss → Vote → Results → Repeat
 
 
-### Backend
-```bash
-cd backend
-npm install
-npm run dev
-```
-
 ### Frontend
 ```bash
 cd frontend
