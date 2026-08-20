@@ -1,4 +1,4 @@
-# Impostor Game
+# [Impostor Game](https://fakeout.fly.dev)
 
 A real-time multiplayer impostor game with host/player screens, built with React, TypeScript, and Socket.IO.
 
