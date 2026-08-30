@@ -1,4 +1,4 @@
-# Impostor Game
+# [Impostor Game](https://fakeout.fly.dev)
 
 A real-time multiplayer impostor game with host/player screens, built with React, TypeScript, and Socket.IO.
 
@@ -17,21 +17,7 @@ A real-time multiplayer impostor game with host/player screens, built with React
 2. **Players**: Open on phones → Enter name + PIN → Join Game
 3. **Game Flow**: Answer → Discuss → Vote → Results → Repeat
 
-## Setup
 
-### Backend
-```bash
-cd backend
-npm install
-npm run dev
-```
-
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 ## Tech Stack
 
