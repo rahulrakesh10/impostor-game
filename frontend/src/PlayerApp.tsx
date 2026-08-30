@@ -67,6 +67,8 @@ function PlayerApp() {
   const [socketConnected, setSocketConnected] = useState<boolean>(false);
   const [gameState, setGameState] = useState<GameState>({ state: 'landing' });
   const [selectedAnswer, setSelectedAnswer] = useState<string>('');
+  const [answerSubmitted, setAnswerSubmitted] = useState<boolean>(false);
+  const [voteSubmitted, setVoteSubmitted] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(0);
 
@@ -143,8 +145,12 @@ function PlayerApp() {
         scores: data.scores ?? prev.scores,
         lastResult: data.lastResult ?? prev.lastResult
       }));
-      if (data.hasAnswered || data.hasVoted) {
-        setSelectedAnswer('');
+      setAnswerSubmitted(data.state === 'answering' && !!data.hasAnswered);
+      setVoteSubmitted(data.state === 'voting' && !!data.hasVoted);
+      if (data.state === 'answering' && data.hasAnswered) {
+        setSelectedAnswer(data.submittedAnswerId ?? '');
+      } else if (data.state === 'voting' && data.hasVoted) {
+        setSelectedAnswer(data.submittedVoteId ?? '');
       }
       setCountdown(data.timeLeft ?? 0);
     });
@@ -165,6 +171,7 @@ function PlayerApp() {
         timer: data.timer
       }));
       setSelectedAnswer('');
+      setAnswerSubmitted(false);
       setCountdown(data.timer);
     });
 
@@ -201,6 +208,7 @@ function PlayerApp() {
         timer: data.timer
       }));
       setSelectedAnswer('');
+      setVoteSubmitted(false);
       setCountdown(data.timer);
     });
 
@@ -268,6 +276,7 @@ function PlayerApp() {
   const submitAnswer = () => {
     if (selectedAnswer && gameState.room) {
       soundManager.playSubmit();
+      setAnswerSubmitted(true);
       socket?.emit('answer:submit', {
         pin: gameState.room.pin,
         targetUserId: selectedAnswer
@@ -278,6 +287,7 @@ function PlayerApp() {
   const submitVote = () => {
     if (selectedAnswer && gameState.room) {
       soundManager.playSubmit();
+      setVoteSubmitted(true);
       socket?.emit('vote:submit', {
         pin: gameState.room.pin,
         targetUserId: selectedAnswer
@@ -297,7 +307,14 @@ function PlayerApp() {
       />
     );
   } else if (gameState.state === 'answering') {
-    screen = (
+    screen = answerSubmitted ? (
+      <SubmissionConfirmedScreen
+        kind="answer"
+        selectedId={selectedAnswer}
+        players={gameState.room!.players}
+        timer={countdown}
+      />
+    ) : (
       <PlayerAnswerScreen
         question={gameState.currentQuestion!}
         isImpostor={gameState.isImpostor!}
@@ -316,7 +333,14 @@ function PlayerApp() {
       />
     );
   } else if (gameState.state === 'voting') {
-    screen = (
+    screen = voteSubmitted ? (
+      <SubmissionConfirmedScreen
+        kind="vote"
+        selectedId={selectedAnswer}
+        players={gameState.room!.players}
+        timer={countdown}
+      />
+    ) : (
       <PlayerVotingScreen
         players={gameState.room!.players}
         selectedVote={selectedAnswer}
@@ -497,6 +521,54 @@ function PlayerAnswerScreen({
         >
           Submit Statement
         </button>
+      </div>
+    </div>
+  );
+}
+
+function SubmissionConfirmedScreen({
+  kind,
+  selectedId,
+  players,
+  timer
+}: {
+  kind: 'answer' | 'vote';
+  selectedId: string;
+  players: Player[];
+  timer?: number;
+}) {
+  const selectedPlayer = players.find(p => p.id === selectedId);
+  const copy = kind === 'answer'
+    ? {
+        tag: 'Statement Filed',
+        pickLabel: 'You named',
+        waiting: 'Waiting on the rest of the room to answer...',
+        next: 'Discussion opens once everyone has.'
+      }
+    : {
+        tag: 'Accusation Locked',
+        pickLabel: 'You accused',
+        waiting: 'Waiting on the rest of the room to vote...',
+        next: "Results are in once everyone's voted."
+      };
+
+  return (
+    <div className="screen">
+      <div className="container">
+        {timer !== undefined && <div className="timer">{timer}s</div>}
+
+        <div className="confirmation">
+          <div className="case-tag">{copy.tag}</div>
+          <h2>Locked In</h2>
+
+          <div className="confirmation-pick">
+            <span className="confirmation-pick-label">{copy.pickLabel}</span>
+            <span className="confirmation-pick-name">{selectedPlayer?.displayName}</span>
+          </div>
+
+          <p className="confirmation-waiting">{copy.waiting}</p>
+          <p className="confirmation-next">{copy.next}</p>
+        </div>
       </div>
     </div>
   );
