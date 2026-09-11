@@ -6,9 +6,9 @@ A real-time multiplayer impostor game with host/player screens, built with React
 
 - �� **Host/Player Screens**: Automatic detection based on screen size
 - 🎯 **Real-time Multiplayer**: Socket.IO for instant communication
-- 🎨 **Beautiful UI**: Animated gradients and modern design
-- 📱 **Kahoot-style Joining**: Easy room PIN system
-- ⏱️ **Timed Rounds**: Answering (30s), Discussion (120s), Voting (15s)
+-  **Beautiful UI**: Animated gradients and modern design
+-  **Kahoot-style Joining**: Easy room PIN system
+-  **Timed Rounds**: Answering (30s), Discussion (120s), Voting (15s)
 -  **Leaderboard**: Track scores across rounds
 
 ## How to Play
