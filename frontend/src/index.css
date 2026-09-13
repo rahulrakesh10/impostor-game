@@ -7,8 +7,8 @@
   --line: #34362e;
   --ink: #e7e3d6;
   --ink-bright: #f2ede0;
-  --muted: #8a8672;
-  --muted-dim: #605f52;
+  --muted: #a19e8e;
+  --muted-dim: #908f86;
   --accent: #b5121b;
   --accent-bright: #ff6b6b;
   --ok: #6b8f47;
@@ -322,7 +322,7 @@ body::before {
   color: var(--accent-bright);
   padding: 4px 11px;
   border-radius: 2px;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -571,7 +571,7 @@ body::before {
 }
 
 .status-indicator {
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -597,9 +597,9 @@ body::before {
   flex-shrink: 0;
   background: none;
   border: 1px solid var(--line);
-  color: var(--muted-dim);
+  color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -619,7 +619,7 @@ body::before {
   color: var(--ok-bright);
   padding: 3px 9px;
   border-radius: 2px;
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -627,7 +627,7 @@ body::before {
 }
 
 .waiting-status {
-  color: var(--muted-dim);
+  color: var(--muted);
   letter-spacing: 0.06em;
 }
 
