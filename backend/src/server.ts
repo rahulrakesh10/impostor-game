@@ -825,11 +825,8 @@ io.on('connection', (socket) => {
     }));
     
     io.to(pin).emit('answers:update', { answers: answerData });
-    
-    // Check if all answers received
-    if (room.currentRoundData.answers.size === room.players.size) {
-      startDiscussion(room);
-    }
+
+    checkPhaseCompletion(room);
   });
 
   socket.on('vote:submit', (data) => {
@@ -845,11 +842,8 @@ io.on('connection', (socket) => {
     if (!userId || !room.currentRoundData) return;
     
     room.currentRoundData.votes.set(userId, targetUserId);
-    
-    // Check if all votes received
-    if (room.currentRoundData.votes.size === room.players.size) {
-      calculateResults(room);
-    }
+
+    checkPhaseCompletion(room);
   });
 
   socket.on('discussion:skip-to-voting', (data) => {
@@ -953,6 +947,14 @@ io.on('connection', (socket) => {
     }, RECONNECT_GRACE_MS);
 
     disconnectTimeouts.set(userId, timeout);
+
+    // The round might have been waiting only on this player - don't make everyone
+    // else sit through the rest of the phase timer now that they've dropped.
+    for (const room of rooms.values()) {
+      if (room.players.has(userId)) {
+        checkPhaseCompletion(room);
+      }
+    }
   });
 });
 
@@ -961,6 +963,30 @@ function getUserIdFromSocket(socketId: string): string | undefined {
     if (sId === socketId) return userId;
   }
   return undefined;
+}
+
+// Players sitting in their reconnect grace period shouldn't block a round from
+// advancing - only players actually connected right now count toward "everyone's in".
+function connectedPlayerCount(room: Room): number {
+  let count = 0;
+  for (const userId of room.players.keys()) {
+    if (!disconnectTimeouts.has(userId)) count++;
+  }
+  return count;
+}
+
+// Re-checks whether the current phase can move on now that the set of connected
+// players has changed (a submission came in, or someone just disconnected).
+function checkPhaseCompletion(room: Room) {
+  if (!room.currentRoundData) return;
+  const connected = connectedPlayerCount(room);
+  if (connected === 0) return;
+
+  if (room.state === 'answering' && room.currentRoundData.answers.size >= connected) {
+    startDiscussion(room);
+  } else if (room.state === 'voting' && room.currentRoundData.votes.size >= connected) {
+    calculateResults(room);
+  }
 }
 
 function getTimeLeft(room: Room): number {
