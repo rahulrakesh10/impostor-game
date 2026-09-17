@@ -607,7 +607,7 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production'
-      ? ["https://fakeout.fly.dev"]
+      ? ["https://fakeout.fly.dev", "https://whosfake.app", "https://www.whosfake.app"]
       : "http://localhost:5173",
     methods: ["GET", "POST"]
   }
